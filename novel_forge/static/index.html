@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novel Forge — 面白さ最優先の小説工房</title>
+<style>
+  :root {
+    --bg: #17151f; --panel: #211e2c; --panel2: #2a2638;
+    --ink: #ece7dd; --dim: #9a93a8; --accent: #e0b355; --accent2: #7c6ff0;
+    --danger: #e06767; --ok: #6fbf8f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+    line-height: 1.7;
+  }
+  header {
+    padding: 18px 28px; border-bottom: 1px solid #363048;
+    display: flex; align-items: baseline; gap: 16px;
+  }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: .12em; color: var(--accent); }
+  header span { color: var(--dim); font-size: 13px; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px 28px; }
+  .panel { background: var(--panel); border: 1px solid #363048; border-radius: 10px; padding: 18px; }
+  h2 { font-size: 14px; letter-spacing: .15em; color: var(--accent); margin: 0 0 12px; }
+  label { display: block; font-size: 12px; color: var(--dim); margin-top: 10px; }
+  input, textarea, select {
+    width: 100%; background: var(--panel2); color: var(--ink);
+    border: 1px solid #453e5e; border-radius: 6px; padding: 8px 10px;
+    font-family: inherit; font-size: 14px;
+  }
+  textarea { min-height: 72px; resize: vertical; }
+  button {
+    background: var(--accent2); color: #fff; border: 0; border-radius: 6px;
+    padding: 9px 14px; margin: 10px 6px 0 0; cursor: pointer;
+    font-family: inherit; font-size: 13px; letter-spacing: .05em;
+  }
+  button.gold { background: var(--accent); color: #241f10; font-weight: bold; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  #output {
+    white-space: pre-wrap; background: var(--panel2); border: 1px solid #453e5e;
+    border-radius: 8px; padding: 18px; min-height: 420px; max-height: 68vh;
+    overflow-y: auto; font-size: 15px;
+  }
+  .badge { display: inline-block; font-size: 11px; border-radius: 4px; padding: 1px 7px; margin-left: 6px; }
+  .done { background: #24402f; color: var(--ok); }
+  .todo { background: #402a2a; color: var(--danger); }
+  ul.fs { padding-left: 18px; font-size: 12.5px; color: var(--dim); margin: 6px 0; }
+  ul.fs .open { color: var(--accent); }
+  #status-box { font-size: 13px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Novel Forge</h1>
+  <span>危機 → 安心 → 再危機 → 反転。伏線はすべて回収する、面白さ最優先の小説工房。</span>
+</header>
+<main>
+  <div>
+    <div class="panel">
+      <h2>新しい物語</h2>
+      <label>タイトル</label><input id="title" placeholder="例: 硝子の来訪者">
+      <label>ジャンル</label><input id="genre" placeholder="例: ミステリー / ホラー / 青春">
+      <label>アイデア・要望</label><textarea id="idea" placeholder="舞台、主人公像、入れたい要素など(空欄でも可)"></textarea>
+      <label>話数</label><input id="episodes" type="number" value="12" min="3" max="100">
+      <button class="gold" onclick="createProject()">プロジェクト作成</button>
+    </div>
+
+    <div class="panel" style="margin-top:20px">
+      <h2>プロジェクト</h2>
+      <select id="projects" onchange="refreshStatus()"></select>
+      <div id="status-box"></div>
+      <div>
+        <button id="btn-concept" onclick="runStage('concept')">① 企画</button>
+        <button id="btn-characters" onclick="runStage('characters')">② キャラ</button>
+        <button id="btn-plot" onclick="runStage('plot')">③ プロット</button>
+      </div>
+      <div>
+        <button id="btn-write" class="gold" onclick="writeNext()">④ 次の話を書く</button>
+        <button id="btn-write-all" onclick="writeAll()">最終話まで一気に</button>
+        <button onclick="exportNovel()">全文を開く</button>
+      </div>
+      <div id="foreshadows"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 id="output-title">出力</h2>
+    <div id="output">左のパネルから物語を作成し、① → ② → ③ → ④ の順に進めてください。</div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let busy = false;
+
+function setBusy(v) {
+  busy = v;
+  for (const id of ["btn-concept","btn-characters","btn-plot","btn-write","btn-write-all"])
+    $(id).disabled = v;
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res;
+}
+
+async function loadProjects(selectSlug) {
+  const list = await (await api("/api/projects")).json();
+  const sel = $("projects");
+  sel.innerHTML = "";
+  for (const slug of list) {
+    const o = document.createElement("option");
+    o.value = o.textContent = slug;
+    sel.appendChild(o);
+  }
+  if (selectSlug) sel.value = selectSlug;
+  await refreshStatus();
+}
+
+async function createProject() {
+  try {
+    const body = {
+      title: $("title").value.trim(),
+      genre: $("genre").value.trim(),
+      idea: $("idea").value.trim(),
+      episodes: parseInt($("episodes").value, 10) || 12,
+    };
+    if (!body.title) { alert("タイトルを入力してください"); return; }
+    const res = await (await api("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })).json();
+    await loadProjects(res.slug);
+  } catch (e) { alert(e.message); }
+}
+
+function badge(done) {
+  return `<span class="badge ${done ? "done" : "todo"}">${done ? "済" : "未"}</span>`;
+}
+
+async function refreshStatus() {
+  const slug = $("projects").value;
+  if (!slug) { $("status-box").innerHTML = ""; $("foreshadows").innerHTML = ""; return; }
+  const s = await (await api(`/api/projects/${encodeURIComponent(slug)}`)).json();
+  $("status-box").innerHTML =
+    `<p>『${s.title}』 ${s.genre || ""}<br>` +
+    `進捗 ${s.written.length}/${s.episodes} 話<br>` +
+    `企画${badge(s.has_concept)} キャラ${badge(s.has_characters)} プロット${badge(s.has_plot)}</p>`;
+  const open = s.foreshadows.filter(f => f.resolved_in === null);
+  const closed = s.foreshadows.filter(f => f.resolved_in !== null);
+  let html = "";
+  if (s.foreshadows.length) {
+    html += `<h2 style="margin-top:14px">伏線台帳(未回収 ${open.length})</h2><ul class="fs">`;
+    for (const f of open) html += `<li class="open">${f.description}(第${f.planted_in}話〜)</li>`;
+    for (const f of closed) html += `<li>${f.description}(第${f.planted_in}話 → 第${f.resolved_in}話で回収)</li>`;
+    html += "</ul>";
+  }
+  $("foreshadows").innerHTML = html;
+}
+
+async function streamTo(path, title) {
+  if (busy) return;
+  const slug = $("projects").value;
+  if (!slug) { alert("プロジェクトを選択してください"); return; }
+  setBusy(true);
+  $("output-title").textContent = title;
+  const out = $("output");
+  out.textContent = "";
+  try {
+    const res = await api(path.replace("{slug}", encodeURIComponent(slug)), { method: "POST" });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      out.textContent += decoder.decode(value, { stream: true });
+      out.scrollTop = out.scrollHeight;
+    }
+  } catch (e) {
+    out.textContent += "\n[エラー] " + e.message;
+  } finally {
+    setBusy(false);
+    await refreshStatus();
+  }
+}
+
+const stageTitles = { concept: "企画書", characters: "キャラクター設定", plot: "全話プロット" };
+function runStage(stage) { streamTo(`/api/projects/{slug}/stage/${stage}`, stageTitles[stage]); }
+function writeNext() { streamTo("/api/projects/{slug}/write", "執筆"); }
+function writeAll() {
+  if (confirm("最終話まで連続で執筆します。時間とAPIコストがかかります。よろしいですか?"))
+    streamTo("/api/projects/{slug}/write-all", "連続執筆");
+}
+function exportNovel() {
+  const slug = $("projects").value;
+  if (slug) window.open(`/api/projects/${encodeURIComponent(slug)}/export`, "_blank");
+}
+
+loadProjects();
+</script>
+</body>
+</html>
