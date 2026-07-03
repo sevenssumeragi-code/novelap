@@ -35,6 +35,28 @@
   select, input[type="text"], textarea {
     background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
     padding: 8px; font-size: 14px; font-family: inherit; }
+
+  /* ---- タイムライン(シークバー) ---- */
+  .tlcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
+  .tlcard h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent); font-weight: 700; }
+  .tlcard h3 small { color: var(--sub); font-weight: normal; margin-left: 8px; }
+  #tlBar { position: relative; height: 40px; border-radius: 8px; overflow: hidden; cursor: pointer;
+    background: var(--panel2); user-select: none; touch-action: none; }
+  #tlBar .seg { position: absolute; top: 0; height: 100%; border-right: 1px solid rgba(0,0,0,.4);
+    display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(0,0,0,.75);
+    font-weight: 700; overflow: hidden; white-space: nowrap; }
+  #tlBar .sel { position: absolute; top: 0; height: 100%; background: rgba(255,255,255,.32);
+    border: 2px solid #fff; pointer-events: none; display: none; }
+  #tlBar .head { position: absolute; top: 0; width: 3px; height: 100%; background: #fff;
+    box-shadow: 0 0 6px #000; pointer-events: none; }
+  #tlOverrides { position: relative; height: 16px; margin-top: 3px; border-radius: 5px; background: rgba(255,255,255,.05); }
+  #tlOverrides .ov { position: absolute; top: 0; height: 100%; border-radius: 5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 9px; color: rgba(0,0,0,.8); font-weight: 700; }
+  #tlOverrides .ov:hover { outline: 2px solid #fff; }
+  .tlrow { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; font-size: 13px; }
+  #selRangeInfo { color: var(--accent); font-size: 12px; min-width: 130px; }
+  .tlhint { font-size: 11px; color: var(--sub); margin-top: 6px; }
+
   .sidebar { flex: 0 0 380px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow-y: auto; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
   .card h2 { margin: 0 0 10px; font-size: 15px; color: var(--accent); }
@@ -50,6 +72,7 @@
   .charcard textarea { width: 100%; height: 58px; resize: vertical; font-size: 13px; }
   .charcard .row2 { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; font-size: 12px; color: var(--sub); }
   .charcard .del { color: var(--danger); border-color: transparent; background: none; padding: 4px 8px; font-size: 12px; }
+  .charcard select.ckey { font-size: 12px; padding: 4px 6px; }
   .filebtn { position: relative; overflow: hidden; font-size: 12px; padding: 5px 10px; }
   .filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .field { margin-bottom: 10px; }
@@ -93,6 +116,26 @@
       <button id="btnRecord" class="rec">🎥 動画を録画してダウンロード</button>
       <button id="btnRecStop" style="display:none">⏹ 録画中止</button>
     </div>
+
+    <div class="tlcard">
+      <h3>🎚 タイムライン<small>クリックで移動 / ドラッグで区間選択 → BGMを切り替え</small></h3>
+      <div id="tlBar"><div class="sel" id="tlSel"></div><div class="head" id="tlHead" style="left:0"></div></div>
+      <div id="tlOverrides" title="BGM上書き区間(クリックで削除)"></div>
+      <div class="tlrow">
+        <span id="selRangeInfo">区間未選択</span>
+        <label class="inline">BGM
+          <select id="selOvMood">
+            <option value="comical">コミカル</option><option value="daily">日常</option>
+            <option value="tense">緊迫</option><option value="sad">悲哀</option>
+            <option value="epic">決戦</option><option value="heartwarm">ほのぼの</option>
+            <option value="horror">ホラー</option>
+          </select>
+        </label>
+        <button id="btnOvApply" disabled>🎵 この区間に適用</button>
+        <button id="btnOvClear">上書きを全消去</button>
+      </div>
+      <div class="tlhint">色はシーンごとにAIが選曲したBGM。区間を選んで適用すると、その範囲だけ好きなBGMに上書きできます(録画にも反映)。</div>
+    </div>
   </div>
 
   <div class="sidebar">
@@ -100,7 +143,7 @@
       <h2>👥 登場人物<small>名前・設定・外見(画像)を登録</small></h2>
       <div id="charList"></div>
       <button id="btnAddChar">＋ キャラを追加</button>
-      <p class="hint">画像はBB素材(グリーンバック)推奨。「緑背景を透過」でクロマキー合成します。画像がなくてもシルエットで出演します。</p>
+      <p class="hint">お手持ちのキャラ画像(PNG/JPG)をアップロードできます。BB素材(グリーンバック)は「緑を透過」、白背景の画像は「白を透過」で切り抜けます。画像がなくてもシルエットで出演します。</p>
     </div>
 
     <div class="card">
@@ -112,10 +155,10 @@
           <select id="selScenes"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>8</option></select>
         </label>
         <button id="btnGenerate" class="primary">✨ AIで物語を自動作成</button>
-        <button id="btnSample">サンプル劇場</button>
+        <button id="btnSample">📚 内蔵脚本ガチャ</button>
       </div>
       <div id="genStatus"></div>
-      <p class="hint">AI生成にはサーバー側に <code>ANTHROPIC_API_KEY</code> が必要です。BGMもAIがシーンごとに選曲します。まずは「サンプル劇場」でお試しできます。</p>
+      <p class="hint" id="genHint">AI生成にはサーバー側に <code>ANTHROPIC_API_KEY</code> が必要です(モデル: Fable 5 / 思考オン)。BGMもAIがシーンごとに選曲します。「内蔵脚本ガチャ」はAPIキー不要で、Fable 5 が書き下ろした脚本を上演します。</p>
     </div>
 
     <div class="card">
@@ -130,24 +173,27 @@
 /* ============================================================
  *  BB劇場メーカー フロントエンド
  *  - Canvas 1枚に背景/立ち絵/会話ウィンドウを描画(録画しやすくするため)
- *  - BGM は Web Audio でムード別にリアルタイム演奏(選曲はAI)
+ *  - BGM は Web Audio でムード別にリアルタイム演奏(選曲はAI、タイムラインで上書き可)
  *  - MediaRecorder で canvas+音声 を WebM として保存
  * ============================================================ */
+
+const STANDALONE = false;   // true: サーバーなし版(Artifact)。AI生成ボタンを隠す
 
 const W = 1280, H = 720;
 const DLG = { x: 30, y: H - 225, w: W - 60, h: 200 };   // 会話ウィンドウ
 const STAGE_FLOOR = DLG.y - 12;                          // キャラの足元
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d");
+const TAU = Math.PI * 2;
 
 /* ---------------- キャラクター管理 ---------------- */
 const MAX_CHARS = 8;
-let characters = [];   // {id, name, profile, color, chroma, imgData, _img(Canvas|null)}
+let characters = [];   // {id, name, profile, color, keying, imgData, _img(Canvas|null)}
 
 const DEFAULT_CHARS = [
-  { name: "先輩", color: "#e5b74a", chroma: true,
+  { name: "先輩", color: "#e5b74a", keying: "green",
     profile: "体格のいい大学生の先輩。一人称「僕」。低音で棒読み気味。余裕ぶっているが大体ツッコミ役。語尾「〜なんだよなあ」「〜(棒読み)」。" },
-  { name: "後輩", color: "#5ac8e5", chroma: true,
+  { name: "後輩", color: "#5ac8e5", keying: "green",
     profile: "調子のいい後輩。一人称「オレ」。ハイテンションなボケ役で、すぐ話を盛って自滅する。「〜っス!」口調。" },
 ];
 
@@ -158,8 +204,8 @@ function hashColor(name) {
   return `hsl(${h % 360} 60% 62%)`;
 }
 
-/* アップロード画像 → 縮小 + (任意)グリーンバック透過済みキャンバス */
-function processImage(dataUrl, chroma, cb) {
+/* アップロード画像 → 縮小 + (任意)背景透過済みキャンバス。keying: none|green|white */
+function processImage(dataUrl, keying, cb) {
   const img = new Image();
   img.onload = () => {
     const scale = Math.min(1, 600 / img.height, 600 / img.width);
@@ -168,7 +214,7 @@ function processImage(dataUrl, chroma, cb) {
     c.height = Math.max(1, Math.round(img.height * scale));
     const g = c.getContext("2d");
     g.drawImage(img, 0, 0, c.width, c.height);
-    if (chroma) {
+    if (keying === "green") {
       const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
       for (let i = 0; i < d.length; i += 4) {
         const r = d[i], gr = d[i + 1], b = d[i + 2];
@@ -180,6 +226,14 @@ function processImage(dataUrl, chroma, cb) {
         }
       }
       g.putImageData(im, 0, 0);
+    } else if (keying === "white") {
+      const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const mn = Math.min(d[i], d[i + 1], d[i + 2]);
+        if (mn > 242) d[i + 3] = 0;
+        else if (mn > 228) d[i + 3] = Math.round(255 * (242 - mn) / 14);
+      }
+      g.putImageData(im, 0, 0);
     }
     cb(c);
   };
@@ -189,7 +243,7 @@ function processImage(dataUrl, chroma, cb) {
 function saveChars() {
   try {
     localStorage.setItem("bb_chars", JSON.stringify(characters.map(c => ({
-      id: c.id, name: c.name, profile: c.profile, color: c.color, chroma: c.chroma, imgData: c.imgData || null,
+      id: c.id, name: c.name, profile: c.profile, color: c.color, keying: c.keying, imgData: c.imgData || null,
     }))));
   } catch (e) { /* 容量超過などは無視(画像が大きい場合) */ }
 }
@@ -199,10 +253,11 @@ function loadChars() {
   try { saved = JSON.parse(localStorage.getItem("bb_chars") || "null"); } catch (e) {}
   const list = (saved && saved.length) ? saved : DEFAULT_CHARS.map(c => ({ ...c }));
   for (const c of list) {
+    const keying = c.keying || (c.chroma === false ? "none" : "green");   // 旧形式(chroma)から移行
     const ch = { id: c.id || uid(), name: c.name || "名無し", profile: c.profile || "",
-                 color: c.color || hashColor(c.name || "?"), chroma: c.chroma !== false,
+                 color: c.color || hashColor(c.name || "?"), keying,
                  imgData: c.imgData || null, _img: null };
-    if (ch.imgData) processImage(ch.imgData, ch.chroma, cv => { ch._img = cv; renderCharList(); });
+    if (ch.imgData) processImage(ch.imgData, ch.keying, cv => { ch._img = cv; renderCharList(); });
     characters.push(ch);
   }
 }
@@ -222,27 +277,29 @@ function renderCharList() {
       <textarea class="cprofile" placeholder="設定・口調・一人称など(AIが厳密に守ります)"></textarea>
       <div class="row2">
         <button class="filebtn">🖼 外見をアップロード<input type="file" accept="image/*" class="cfile"></button>
-        <label class="inline"><input type="checkbox" class="cchroma">緑背景を透過</label>
+        <select class="ckey" title="画像の背景の切り抜き方">
+          <option value="green">緑を透過</option><option value="white">白を透過</option><option value="none">透過なし</option>
+        </select>
         <span style="flex:1"></span>
         <button class="del">✕ 削除</button>
       </div>`;
     div.querySelector(".cname").value = c.name;
     div.querySelector(".ccolor").value = toHex(c.color);
     div.querySelector(".cprofile").value = c.profile;
-    div.querySelector(".cchroma").checked = c.chroma;
+    div.querySelector(".ckey").value = c.keying;
     div.querySelector(".cname").addEventListener("input", e => { c.name = e.target.value; saveChars(); });
     div.querySelector(".ccolor").addEventListener("input", e => { c.color = e.target.value; saveChars(); });
     div.querySelector(".cprofile").addEventListener("input", e => { c.profile = e.target.value; saveChars(); });
-    div.querySelector(".cchroma").addEventListener("change", e => {
-      c.chroma = e.target.checked; saveChars();
-      if (c.imgData) processImage(c.imgData, c.chroma, cv => { c._img = cv; renderCharList(); });
+    div.querySelector(".ckey").addEventListener("change", e => {
+      c.keying = e.target.value; saveChars();
+      if (c.imgData) processImage(c.imgData, c.keying, cv => { c._img = cv; renderCharList(); });
     });
     div.querySelector(".cfile").addEventListener("change", e => {
       const f = e.target.files[0]; if (!f) return;
       const fr = new FileReader();
       fr.onload = () => {
         c.imgData = fr.result;
-        processImage(c.imgData, c.chroma, cv => { c._img = cv; saveChars(); renderCharList(); });
+        processImage(c.imgData, c.keying, cv => { c._img = cv; saveChars(); renderCharList(); });
       };
       fr.readAsDataURL(f);
     });
@@ -262,7 +319,7 @@ function toHex(color) {
 document.getElementById("btnAddChar").addEventListener("click", () => {
   if (characters.length >= MAX_CHARS) return alert(`キャラは最大${MAX_CHARS}人までです`);
   characters.push({ id: uid(), name: `キャラ${characters.length + 1}`, profile: "", color: hashColor(uid()),
-                    chroma: true, imgData: null, _img: null });
+                    keying: "green", imgData: null, _img: null });
   saveChars(); renderCharList();
 });
 
@@ -277,144 +334,447 @@ function getActor(name) {
   return ephemeral[name];
 }
 
-/* ---------------- 背景描画(時刻対応の手描き背景) ---------------- */
+/* ================= 背景描画(高品質・時刻/アニメ対応) ================= */
 const SKY = {
-  day:     ["#7ec8f7", "#d9f0ff"], evening: ["#f2814d", "#ffd9a0"], night: ["#0b1436", "#25406e"],
+  day:     ["#3d8fd6", "#7ec8f7", "#d8f0ff"],
+  evening: ["#4a3070", "#d0605a", "#ffce8a"],
+  night:   ["#05081c", "#101c42", "#233760"],
 };
-function skyGrad(time, h) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  const [a, b] = SKY[time] || SKY.day;
-  g.addColorStop(0, a); g.addColorStop(1, b); return g;
+function skyGrad(time, y0, y1) {
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  const [a, b, c] = SKY[time] || SKY.day;
+  g.addColorStop(0, a); g.addColorStop(.55, b); g.addColorStop(1, c);
+  return g;
 }
-function drawSunMoon(time) {
-  ctx.save();
+function vgrad(x, y, w, h, c1, c2) {
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+}
+function glow(x, y, r, color, a) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = g;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore();
+}
+function drawSunMoon(time, t) {
   if (time === "night") {
-    ctx.fillStyle = "#f5f0d8"; ctx.beginPath(); ctx.arc(1100, 110, 44, 0, 7); ctx.fill();
-    ctx.fillStyle = SKY.night[0]; ctx.beginPath(); ctx.arc(1082, 100, 40, 0, 7); ctx.fill();
-    ctx.fillStyle = "#fff";
-    for (let i = 0; i < 24; i++) { const x = (i * 379) % W, y = (i * 173) % 260; ctx.fillRect(x, y, 2, 2); }
+    glow(1090, 110, 150, "#dfe8ff", .35);
+    ctx.fillStyle = "#f3eed6"; ctx.beginPath(); ctx.arc(1090, 110, 42, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(190,190,175,.5)";
+    ctx.beginPath(); ctx.arc(1075, 100, 9, 0, TAU); ctx.arc(1102, 122, 6, 0, TAU); ctx.arc(1088, 88, 4, 0, TAU); ctx.fill();
   } else {
-    ctx.fillStyle = time === "evening" ? "#ff9a3d" : "#ffe08a";
-    ctx.beginPath(); ctx.arc(1090, 120, 52, 0, 7); ctx.fill();
+    const col = time === "evening" ? "#ff8f3d" : "#fff3b0";
+    glow(1090, 120, 190, col, time === "evening" ? .5 : .55);
+    ctx.fillStyle = time === "evening" ? "#ffb35c" : "#fff8d8";
+    ctx.beginPath(); ctx.arc(1090, 120, 48, 0, TAU); ctx.fill();
+  }
+}
+function drawStars(t) {
+  ctx.save();
+  for (let i = 0; i < 42; i++) {
+    const x = (i * 379.7) % W, y = (i * 173.3) % 300;
+    ctx.globalAlpha = .35 + .5 * Math.abs(Math.sin(t * 1.5 + i * 2.1));
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(x, y, i % 7 === 0 ? 3 : 2, i % 7 === 0 ? 3 : 2);
   }
   ctx.restore();
 }
-function buildings(baseY, dark) {
-  const cols = dark ? ["#1c2440", "#232c4e", "#2a355c"] : ["#8fa3b8", "#a5b6c8", "#7d92a8"];
+function drawClouds(t, time, baseY) {
+  const col = time === "night" ? "rgba(200,210,235,.14)"
+            : time === "evening" ? "rgba(255,225,200,.5)" : "rgba(255,255,255,.85)";
+  ctx.fillStyle = col;
+  for (let i = 0; i < 4; i++) {
+    const cx = ((i * 430 + t * (9 + i * 3)) % (W + 460)) - 230;
+    const cy = (baseY || 90) + (i % 3) * 55, s = .8 + (i % 3) * .32;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 88 * s, 26 * s, 0, 0, TAU);
+    ctx.ellipse(cx - 62 * s, cy + 10 * s, 52 * s, 20 * s, 0, 0, TAU);
+    ctx.ellipse(cx + 66 * s, cy + 8 * s, 58 * s, 22 * s, 0, 0, TAU);
+    ctx.ellipse(cx + 12 * s, cy - 20 * s, 55 * s, 24 * s, 0, 0, TAU);
+    ctx.fill();
+  }
+}
+function skyline(baseY, color, seed, hMin, hMax) {
+  ctx.fillStyle = color;
+  let x = -30, i = seed;
+  while (x < W + 40) {
+    const w = 70 + (i * 53) % 100, h = hMin + (i * 97) % (hMax - hMin);
+    ctx.fillRect(x, baseY - h, w, h);
+    if (i % 3 === 0) ctx.fillRect(x + w * .3, baseY - h - 14, 5, 14);   // アンテナ
+    x += w + 8 + (i % 2) * 20; i++;
+  }
+}
+function litBuildings(baseY, dark) {
   let x = -20, i = 0;
   while (x < W + 40) {
-    const w = 90 + (i * 53) % 110, h = 130 + (i * 97) % 220;
-    ctx.fillStyle = cols[i % 3]; ctx.fillRect(x, baseY - h, w, h);
-    for (let wy = baseY - h + 16; wy < baseY - 18; wy += 34)
-      for (let wx = x + 10; wx < x + w - 16; wx += 26) {
-        ctx.fillStyle = dark ? ((wx * wy) % 5 < 2 ? "#ffd76b" : "#101830") : "#e8f4ff";
-        ctx.fillRect(wx, wy, 14, 18);
+    const w = 90 + (i * 53) % 110, h = 150 + (i * 97) % 230;
+    vgrad(x, baseY - h, w, h, dark ? "#232c4e" : "#9db1c4", dark ? "#151b34" : "#7d92a8");
+    ctx.fillStyle = dark ? "#10162c" : "#8fa3b8"; ctx.fillRect(x, baseY - h, w, 7);   // 屋上縁
+    for (let wy = baseY - h + 18; wy < baseY - 20; wy += 32)
+      for (let wx = x + 10; wx < x + w - 16; wx += 25) {
+        const lit = ((wx * 7 + wy * 13) % 11) < 4;
+        ctx.fillStyle = dark ? (lit ? "#ffd76b" : "#0c1226") : (lit ? "#eef7ff" : "#c4d4e2");
+        ctx.fillRect(wx, wy, 13, 17);
       }
     x += w + 14; i++;
   }
 }
+function tree(tx, baseY, s, time) {
+  const trunk = ctx.createLinearGradient(tx - 12 * s, 0, tx + 12 * s, 0);
+  trunk.addColorStop(0, "#4a3520"); trunk.addColorStop(.5, "#7a5a35"); trunk.addColorStop(1, "#3d2c1a");
+  ctx.fillStyle = trunk;
+  ctx.fillRect(tx - 11 * s, baseY - 128 * s, 22 * s, 128 * s);
+  const dark = time === "night";
+  const cols = dark ? ["#0e2417", "#16331f", "#1f4429"] : ["#2e6b34", "#43933f", "#63b74f"];
+  for (const [dx, dy, r, ci] of [[0, -160, 82, 0], [-58, -118, 58, 0], [60, -120, 60, 0],
+                                  [-28, -172, 60, 1], [34, -168, 58, 1], [0, -195, 48, 2], [-52, -142, 40, 2]]) {
+    ctx.fillStyle = cols[ci];
+    ctx.beginPath(); ctx.arc(tx + dx * s, baseY + dy * s, r * s, 0, TAU); ctx.fill();
+  }
+}
+function lampPost(x, baseY, time) {
+  ctx.fillStyle = "#3c4048";
+  ctx.fillRect(x - 5, baseY - 210, 10, 210);
+  ctx.beginPath(); ctx.arc(x, baseY - 214, 13, 0, TAU); ctx.fill();
+  ctx.fillStyle = time === "night" ? "#ffe9a0" : "#d8dce2";
+  ctx.beginPath(); ctx.arc(x, baseY - 214, 9, 0, TAU); ctx.fill();
+  if (time === "night") glow(x, baseY - 214, 120, "#ffdf8a", .4);
+}
+function vignette() {
+  const g = ctx.createRadialGradient(W / 2, H / 2 - 60, H * .45, W / 2, H / 2, H * .95);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.34)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
 const BG_DRAW = {
-  room(time) {
-    ctx.fillStyle = time === "night" ? "#4a4038" : "#8a7a63"; ctx.fillRect(0, 0, W, H);       // 壁
-    ctx.fillStyle = time === "night" ? "#6b5335" : "#b08d55"; ctx.fillRect(0, 470, W, H - 470); // 床
-    ctx.fillStyle = "#5c4a33"; ctx.fillRect(0, 462, W, 12);
-    ctx.fillStyle = "#3d3226"; ctx.fillRect(120, 90, 300, 260);                                 // 窓枠
-    ctx.fillStyle = skyGrad(time, 340); ctx.fillRect(132, 102, 276, 236);
-    ctx.fillStyle = "#3d3226"; ctx.fillRect(255, 102, 10, 236); ctx.fillRect(132, 212, 276, 8);
-    ctx.fillStyle = "#4c3b2a"; ctx.fillRect(870, 330, 300, 140);                                // 棚
-    ctx.fillStyle = "#2c2c34"; ctx.fillRect(905, 230, 230, 100);                                // テレビ
-    ctx.fillStyle = time === "night" ? "#9fd8ff" : "#1a2a3a"; ctx.fillRect(915, 240, 210, 80);
-    ctx.fillStyle = "#c9a86a"; ctx.beginPath(); ctx.ellipse(640, 560, 240, 60, 0, 0, 7); ctx.fill(); // ちゃぶ台
-    ctx.fillStyle = "#a8874d"; ctx.beginPath(); ctx.ellipse(640, 548, 240, 60, 0, 0, 7); ctx.fill();
-  },
-  park(time) {
-    ctx.fillStyle = skyGrad(time, 460); ctx.fillRect(0, 0, W, 460); drawSunMoon(time);
-    ctx.fillStyle = time === "night" ? "#1d3b24" : "#69b25a"; ctx.fillRect(0, 430, W, H - 430);
-    for (const [tx, s] of [[180, 1], [420, .8], [1080, 1.1], [860, .7]]) {
-      ctx.fillStyle = "#6d4c2f"; ctx.fillRect(tx - 12 * s, 320, 24 * s, 130 * s);
-      ctx.fillStyle = time === "night" ? "#173321" : "#3e8c3e";
-      ctx.beginPath(); ctx.arc(tx, 300 - 20 * s, 85 * s, 0, 7); ctx.arc(tx - 60 * s, 340, 55 * s, 0, 7); ctx.arc(tx + 60 * s, 340, 55 * s, 0, 7); ctx.fill();
+  room(time, t) {
+    const night = time === "night";
+    vgrad(0, 0, W, 470, night ? "#3d3630" : "#9c8a70", night ? "#2c2620" : "#7d6d55");        // 壁
+    ctx.fillStyle = night ? "#241f19" : "#5c4a33"; ctx.fillRect(0, 452, W, 14);                // 幅木
+    vgrad(0, 466, W, H - 466, night ? "#57432b" : "#b08d55", night ? "#3a2d1d" : "#8a6a3f");   // 床
+    ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {                                                              // 床板
+      ctx.beginPath(); ctx.moveTo(W / 2 + (i - 3) * 90, 466); ctx.lineTo(W / 2 + (i - 3) * 300, H); ctx.stroke();
     }
-    ctx.fillStyle = "#8a6a45"; ctx.fillRect(560, 470, 220, 16); ctx.fillRect(575, 486, 14, 40); ctx.fillRect(750, 486, 14, 40); // ベンチ
-    ctx.fillStyle = time === "night" ? "#2c2c2c" : "#d9cbb2"; ctx.beginPath(); ctx.ellipse(640, 620, 520, 90, 0, 0, 7); ctx.fill(); // 広場
-  },
-  street(time) {
-    ctx.fillStyle = skyGrad(time, 420); ctx.fillRect(0, 0, W, 420); drawSunMoon(time);
-    buildings(430, time === "night");
-    ctx.fillStyle = time === "night" ? "#2a2a30" : "#8f8f96"; ctx.fillRect(0, 430, W, H - 430); // 道路
-    ctx.fillStyle = time === "night" ? "#3a3a42" : "#b9b9c0"; ctx.fillRect(0, 430, W, 60);      // 歩道
-    ctx.strokeStyle = "#f5f5f5"; ctx.lineWidth = 6; ctx.setLineDash([40, 30]);
-    ctx.beginPath(); ctx.moveTo(0, 600); ctx.lineTo(W, 600); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = "#5c5c66"; ctx.fillRect(1150, 120, 14, 370);                                 // 電柱
-    ctx.fillRect(1090, 150, 130, 8);
-  },
-  school(time) {
-    ctx.fillStyle = "#e8e0c8"; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "#c8bda0"; ctx.fillRect(0, 440, W, 12);
-    ctx.fillStyle = time === "night" ? "#7d6f52" : "#c9b98e"; ctx.fillRect(0, 452, W, H - 452); // 床
-    ctx.fillStyle = "#2e5c3f"; ctx.fillRect(390, 90, 520, 250);                                  // 黒板
-    ctx.strokeStyle = "#c9a86a"; ctx.lineWidth = 12; ctx.strokeRect(384, 84, 532, 262);
-    ctx.fillStyle = "#e8e8e8"; ctx.font = "36px sans-serif"; ctx.fillText("BB劇場", 420, 150);
-    for (const wx of [60, 1040]) {                                                                // 窓
-      ctx.fillStyle = "#9a8f74"; ctx.fillRect(wx, 100, 200, 240);
-      ctx.fillStyle = skyGrad(time, 340); ctx.fillRect(wx + 10, 110, 180, 220);
-      ctx.fillStyle = "#9a8f74"; ctx.fillRect(wx + 95, 110, 10, 220);
+    ctx.fillStyle = "#2c241a"; ctx.fillRect(108, 78, 324, 286);                                // 窓枠外
+    ctx.fillStyle = skyGrad(time, 90, 352); ctx.fillRect(122, 92, 296, 258);
+    ctx.save(); ctx.beginPath(); ctx.rect(122, 92, 296, 258); ctx.clip();
+    drawClouds(t, time, 150); if (night) drawStars(t);
+    skyline(350, night ? "#0d1530" : "rgba(90,120,150,.55)", 2, 60, 150);
+    ctx.restore();
+    ctx.fillStyle = "#2c241a"; ctx.fillRect(262, 92, 14, 258); ctx.fillRect(122, 212, 296, 10); // 桟
+    ctx.fillStyle = night ? "#4a3d33" : "#c9b8a0";                                             // カーテン
+    ctx.fillRect(84, 66, 34, 316); ctx.fillRect(424, 66, 34, 316);
+    ctx.fillStyle = "rgba(0,0,0,.15)"; ctx.fillRect(84, 66, 8, 316); ctx.fillRect(424, 66, 8, 316);
+    if (!night) {                                                                              // 差し込む光
+      ctx.fillStyle = "rgba(255,244,200,.14)";
+      ctx.beginPath(); ctx.moveTo(130, 100); ctx.lineTo(410, 100); ctx.lineTo(660, 660); ctx.lineTo(230, 660); ctx.fill();
     }
-    ctx.fillStyle = "#b08d55"; ctx.fillRect(200, 500, 220, 26); ctx.fillRect(860, 500, 220, 26); // 机
-    ctx.fillStyle = "#8a6a3f"; ctx.fillRect(210, 526, 16, 70); ctx.fillRect(394, 526, 16, 70);
-    ctx.fillRect(870, 526, 16, 70); ctx.fillRect(1054, 526, 16, 70);
-  },
-  office(time) {
-    ctx.fillStyle = time === "night" ? "#39404e" : "#dfe4ea"; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = time === "night" ? "#2c313c" : "#c3cad4"; ctx.fillRect(0, 460, W, H - 460);
-    ctx.fillStyle = "#556070"; ctx.fillRect(80, 80, 1120, 12);
-    for (const wx of [100, 480, 860]) {                                                          // 大窓
-      ctx.fillStyle = "#556070"; ctx.fillRect(wx, 92, 320, 250);
-      ctx.fillStyle = skyGrad(time, 350); ctx.fillRect(wx + 8, 100, 304, 234);
-      ctx.save(); ctx.beginPath(); ctx.rect(wx + 8, 100, 304, 234); ctx.clip();
-      ctx.translate(wx - 400, -120); buildings(430, time === "night"); ctx.restore();
+    ctx.fillStyle = "#5a4630"; ctx.fillRect(852, 300, 330, 168);                               // 棚
+    ctx.fillStyle = "#3d2f20"; ctx.fillRect(852, 300, 330, 10); ctx.fillRect(852, 382, 330, 8);
+    const bookCols = ["#b05252", "#5278b0", "#6ba05a", "#c9a13e", "#8a5aa0"];
+    for (let i = 0; i < 11; i++) {                                                             // 本
+      ctx.fillStyle = bookCols[i % 5];
+      ctx.fillRect(866 + i * 20, 318 - (i % 3) * 4, 15, 62 + (i % 3) * 4);
     }
-    ctx.fillStyle = "#8f9aa8"; ctx.fillRect(150, 480, 400, 22); ctx.fillRect(730, 480, 400, 22); // デスク
-    ctx.fillStyle = "#222831"; ctx.fillRect(240, 380, 130, 100); ctx.fillRect(820, 380, 130, 100); // モニタ
-    ctx.fillStyle = "#7ec8f7"; ctx.fillRect(248, 388, 114, 76); ctx.fillRect(828, 388, 114, 76);
+    ctx.fillStyle = "#1c1e26"; ctx.fillRect(900, 168, 240, 118);                               // テレビ
+    const scr = ctx.createLinearGradient(908, 176, 1132, 278);
+    scr.addColorStop(0, night ? "#3a5a80" : "#14202e"); scr.addColorStop(.5, night ? "#182c44" : "#0c141e");
+    scr.addColorStop(1, night ? "#0e1a2c" : "#080d14");
+    ctx.fillStyle = scr; ctx.fillRect(908, 176, 224, 102);
+    ctx.fillStyle = "rgba(255,255,255,.12)";
+    ctx.beginPath(); ctx.moveTo(920, 176); ctx.lineTo(970, 176); ctx.lineTo(930, 278); ctx.lineTo(908, 278); ctx.fill();
+    if (night) glow(1020, 230, 190, "#4a7ab0", .3);
+    ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.beginPath(); ctx.ellipse(640, 590, 265, 40, 0, 0, TAU); ctx.fill();
+    vgrad(400, 520, 480, 62, "#caa76a", "#9a7a45");                                           // ちゃぶ台
+    ctx.beginPath(); ctx.ellipse(640, 522, 240, 52, 0, 0, TAU);
+    const tbl = ctx.createLinearGradient(0, 470, 0, 574);
+    tbl.addColorStop(0, "#d8b578"); tbl.addColorStop(1, "#a8874d");
+    ctx.fillStyle = tbl; ctx.fill();
+    ctx.fillStyle = "#7ba05a"; ctx.beginPath(); ctx.arc(700, 500, 22, 0, TAU); ctx.fill();      // 湯呑みと急須気分
+    ctx.fillStyle = "#e8e2d0"; ctx.beginPath(); ctx.arc(590, 508, 13, 0, TAU); ctx.fill();
+    if (night) glow(640, 60, 320, "#ffd9a0", .22);                                             // 室内灯
   },
-  conbini(time) {
-    ctx.fillStyle = skyGrad(time, 510); ctx.fillRect(0, 0, W, 510); drawSunMoon(time);
-    ctx.fillStyle = "#f2f2ee"; ctx.fillRect(90, 170, 1100, 330);                                 // 店舗
-    ctx.fillStyle = "#fff"; ctx.fillRect(90, 170, 1100, 60);
-    ctx.fillStyle = "#e84545"; ctx.fillRect(90, 178, 1100, 14);
-    ctx.fillStyle = "#2e7dd1"; ctx.fillRect(90, 208, 1100, 14);
-    ctx.fillStyle = "#333"; ctx.font = "bold 40px sans-serif"; ctx.fillText("BBマート 24h", 500, 218);
-    ctx.fillStyle = time === "night" ? "#fff8d0" : "#dff2ff";                                    // 光る窓
-    ctx.fillRect(130, 250, 300, 240); ctx.fillRect(470, 250, 300, 240); ctx.fillRect(880, 250, 270, 240);
-    ctx.fillStyle = "#b9c4cc";
-    ctx.fillRect(455, 250, 15, 240); ctx.fillRect(770, 250, 15, 240);
-    ctx.fillStyle = time === "night" ? "#30343c" : "#9aa4ae"; ctx.fillRect(0, 500, W, H - 500);   // 駐車場
-    ctx.strokeStyle = "#eee"; ctx.lineWidth = 5;
-    for (const lx of [200, 500, 800, 1100]) { ctx.beginPath(); ctx.moveTo(lx, 520); ctx.lineTo(lx - 60, 700); ctx.stroke(); }
-  },
-  beach(time) {
-    ctx.fillStyle = skyGrad(time, 400); ctx.fillRect(0, 0, W, 400); drawSunMoon(time);
-    ctx.fillStyle = time === "night" ? "#12365c" : "#2e8fd1"; ctx.fillRect(0, 360, W, 160);      // 海
-    ctx.fillStyle = time === "night" ? "#1c4a78" : "#5ab4e8";
-    for (let x = 0; x < W; x += 90) { ctx.beginPath(); ctx.arc(x + 45, 520, 45, Math.PI, 0); ctx.fill(); }
-    ctx.fillStyle = time === "night" ? "#8a7a55" : "#e8d9a0"; ctx.fillRect(0, 520, W, H - 520);  // 砂浜
-    ctx.fillStyle = "#fff"; ctx.globalAlpha = .7;
-    for (let x = 20; x < W; x += 160) ctx.fillRect(x, 356, 70, 5);
-    ctx.globalAlpha = 1;
-  },
-  night_city(time) {
-    ctx.fillStyle = skyGrad("night", 420); ctx.fillRect(0, 0, W, 420); drawSunMoon("night");
-    buildings(440, true);
-    ctx.fillStyle = "#17171d"; ctx.fillRect(0, 440, W, H - 440);
-    const neon = [["#ff4d88", 150, 200], ["#4dd2ff", 420, 150], ["#ffe14d", 760, 230], ["#7dff6b", 1010, 170]];
-    for (const [c, x, y] of neon) {
-      ctx.fillStyle = c; ctx.globalAlpha = .9; ctx.fillRect(x, y, 120, 46);
-      ctx.globalAlpha = .25; ctx.fillRect(x - 8, y - 8, 136, 62); ctx.globalAlpha = 1;
-      ctx.fillStyle = "#111"; ctx.font = "bold 26px sans-serif"; ctx.fillText("〼〼", x + 30, y + 33);
+
+  park(time, t) {
+    ctx.fillStyle = skyGrad(time, 0, 470); ctx.fillRect(0, 0, W, 470);
+    if (time === "night") drawStars(t);
+    drawSunMoon(time, t); drawClouds(t, time, 95);
+    skyline(432, time === "night" ? "#0a1226" : time === "evening" ? "rgba(90,60,90,.45)" : "rgba(110,150,120,.4)", 5, 30, 90);
+    ctx.fillStyle = time === "night" ? "#122718" : "#2e6b34";                                  // 遠景の木々
+    for (let x = -40; x < W + 60; x += 90) {
+      ctx.beginPath(); ctx.arc(x, 428, 46 + (x * 7) % 18, 0, TAU); ctx.fill();
     }
-    ctx.fillStyle = "#f5d76b"; ctx.globalAlpha = .15;
-    ctx.beginPath(); ctx.ellipse(640, 700, 620, 120, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    vgrad(0, 428, W, H - 428, time === "night" ? "#1c3a24" : "#6cb45c", time === "night" ? "#0f2415" : "#4a9345");
+    ctx.fillStyle = time === "night" ? "#3a3226" : "#d9c9a8";                                  // 散歩道
+    ctx.beginPath(); ctx.moveTo(430, 428); ctx.lineTo(850, 428); ctx.lineTo(1200, H); ctx.lineTo(80, H); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,.1)";
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(640 + (i - 2) * 90, 500 + i * 40, 60 + i * 20, 8, 0, 0, TAU); ctx.fill(); }
+    tree(170, 470, 1.15, time); tree(1105, 462, 1.3, time); tree(430, 440, .72, time); tree(890, 436, .6, time);
+    ctx.fillStyle = time === "night" ? "#13301c" : "#3e8c3e";                                  // 植え込み
+    for (const [bx, br] of [[300, 40], [345, 34], [980, 38], [1030, 30]]) {
+      ctx.beginPath(); ctx.arc(bx, 452, br, Math.PI, 0); ctx.fill();
+    }
+    if (time !== "night") {
+      ctx.fillStyle = "#e86a8a";                                                                // 花
+      for (let i = 0; i < 12; i++) ctx.fillRect(275 + (i * 67) % 130 + (i > 5 ? 680 : 0), 440 - (i % 3) * 6, 5, 5);
+    }
+    // ベンチ
+    ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(660, 528, 130, 14, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#6a4c2c";
+    for (let i = 0; i < 3; i++) ctx.fillRect(552, 452 + i * 12, 216, 8);
+    ctx.fillRect(552, 408, 216, 8); ctx.fillRect(552, 422, 216, 8);                             // 背もたれ
+    ctx.fillStyle = "#2e3238";
+    ctx.fillRect(562, 452, 10, 72); ctx.fillRect(748, 452, 10, 72);
+    lampPost(388, 452, time);
+    if (time === "day") {                                                                      // 鳥
+      ctx.strokeStyle = "rgba(40,50,60,.7)"; ctx.lineWidth = 3;
+      for (const [bx, by] of [[300, 130], [350, 108], [880, 160]]) {
+        const f = Math.sin(t * 7 + bx) * 5;
+        ctx.beginPath(); ctx.moveTo(bx - 14, by + f); ctx.quadraticCurveTo(bx, by - 8, bx + 2, by + f);
+        ctx.quadraticCurveTo(bx + 4, by - 8, bx + 16, by + f); ctx.stroke();
+      }
+    }
+  },
+
+  street(time, t) {
+    ctx.fillStyle = skyGrad(time, 0, 430); ctx.fillRect(0, 0, W, 430);
+    if (time === "night") drawStars(t);
+    drawSunMoon(time, t); drawClouds(t, time, 80);
+    skyline(432, time === "night" ? "rgba(16,24,52,.9)" : "rgba(130,155,180,.5)", 3, 80, 200);  // 遠景ビル
+    litBuildings(438, time === "night");
+    // 店先の日よけ
+    for (const [ax, ac] of [[60, "#c9564d"], [420, "#4d7ec9"], [760, "#4da05c"]]) {
+      ctx.fillStyle = ac;
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i % 2 ? "#f2ede0" : ac;
+        ctx.beginPath(); ctx.moveTo(ax + i * 30, 360); ctx.lineTo(ax + 30 + i * 30, 360);
+        ctx.lineTo(ax + 30 + i * 30, 392); ctx.arc(ax + 15 + i * 30, 392, 15, 0, Math.PI); ctx.lineTo(ax + i * 30, 392); ctx.fill();
+      }
+    }
+    vgrad(0, 438, W, 60, time === "night" ? "#3c3c46" : "#c2c2ca", time === "night" ? "#30303a" : "#aeaeb8"); // 歩道
+    ctx.strokeStyle = "rgba(0,0,0,.25)";
+    for (let x = 0; x < W; x += 80) { ctx.beginPath(); ctx.moveTo(x, 438); ctx.lineTo(x - 20, 498); ctx.stroke(); }
+    vgrad(0, 498, W, H - 498, time === "night" ? "#26262e" : "#77777f", time === "night" ? "#1a1a20" : "#5c5c64"); // 車道
+    ctx.fillStyle = "#e8e8e8";
+    for (let i = 0; i < 7; i++) ctx.fillRect(120 + i * 170, 590, 90, 12);                       // センターライン
+    for (let i = 0; i < 9; i++) ctx.fillRect(60 + i * 140, 510, 70, 22);                        // 横断歩道
+    ctx.fillStyle = "#3a3e46"; ctx.fillRect(1146, 96, 16, 402);                                 // 電柱
+    ctx.fillRect(1090, 130, 130, 9); ctx.fillRect(1106, 168, 96, 7);
+    ctx.strokeStyle = "rgba(20,22,30,.75)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, 118); ctx.quadraticCurveTo(560, 190, 1096, 136); ctx.stroke(); // 電線
+    ctx.beginPath(); ctx.moveTo(0, 90); ctx.quadraticCurveTo(600, 160, 1100, 132); ctx.stroke();
+    if (time === "night") { lampPost(240, 498, time); lampPost(900, 498, time); }
+  },
+
+  school(time, t) {
+    vgrad(0, 0, W, 100, "#d8d2bc", "#e8e2cc");                                                  // 天井
+    ctx.fillStyle = "#c2bca6"; ctx.fillRect(0, 96, W, 8);
+    for (const lx of [240, 640, 1040]) {                                                        // 蛍光灯
+      ctx.fillStyle = "#9a947e"; ctx.fillRect(lx - 90, 40, 180, 12);
+      ctx.fillStyle = "#fffef0"; ctx.fillRect(lx - 82, 44, 164, 6);
+      if (time !== "day") glow(lx, 52, 130, "#fff8d0", .3);
+    }
+    vgrad(0, 104, W, 336, "#ece5cd", "#dcd2b4");                                                // 壁
+    // 黒板
+    ctx.fillStyle = "#8a6a3f"; ctx.fillRect(374, 128, 552, 268);
+    const bb = ctx.createLinearGradient(0, 140, 0, 384);
+    bb.addColorStop(0, "#2c5940"); bb.addColorStop(1, "#1e4230");
+    ctx.fillStyle = bb; ctx.fillRect(388, 140, 524, 244);
+    ctx.fillStyle = "rgba(255,255,255,.08)"; ctx.fillRect(388, 140, 524, 60);
+    ctx.fillStyle = "#e8e4d8"; ctx.font = "34px 'Yu Mincho', serif";
+    ctx.fillText("本日の演目:BB劇場", 420, 196);
+    ctx.strokeStyle = "rgba(232,228,216,.5)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(420, 216); ctx.lineTo(750, 216); ctx.stroke();
+    ctx.fillStyle = "#f2b8c2"; ctx.fillText("完", 830, 350);
+    ctx.fillStyle = "#8a6a3f"; ctx.fillRect(374, 396, 552, 14);                                  // チョーク受け
+    ctx.fillStyle = "#fff"; ctx.fillRect(700, 390, 34, 7); ctx.fillStyle = "#f2b8c2"; ctx.fillRect(748, 390, 26, 7);
+    for (const wx of [40, 1050]) {                                                               // 窓
+      ctx.fillStyle = "#b8ad8e"; ctx.fillRect(wx, 130, 200, 250);
+      ctx.fillStyle = skyGrad(time, 140, 372); ctx.fillRect(wx + 10, 140, 180, 230);
+      ctx.save(); ctx.beginPath(); ctx.rect(wx + 10, 140, 180, 230); ctx.clip();
+      drawClouds(t, time, 180); if (time === "night") drawStars(t);
+      ctx.restore();
+      ctx.fillStyle = "#b8ad8e"; ctx.fillRect(wx + 96, 140, 9, 230); ctx.fillRect(wx + 10, 250, 180, 8);
+      if (time === "day") {
+        ctx.fillStyle = "rgba(255,248,210,.16)";
+        ctx.beginPath(); ctx.moveTo(wx + 14, 150); ctx.lineTo(wx + 186, 150); ctx.lineTo(wx + 320, 660); ctx.lineTo(wx + 60, 660); ctx.fill();
+      }
+    }
+    ctx.fillStyle = "#f8f4e8"; ctx.beginPath(); ctx.arc(640, 70, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#faf6ea"; ctx.beginPath(); ctx.arc(950, 90, 26, 0, TAU); ctx.fill();        // 時計
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(950, 90); ctx.lineTo(950, 74); ctx.moveTo(950, 90); ctx.lineTo(960, 96); ctx.stroke();
+    vgrad(0, 440, W, H - 440, time === "night" ? "#8a7a5c" : "#cdb98a", time === "night" ? "#6a5c42" : "#a8935f"); // 床
+    ctx.strokeStyle = "rgba(0,0,0,.14)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + (i - 4) * 130, 440); ctx.lineTo(W / 2 + (i - 4) * 340, H); ctx.stroke(); }
+    for (const [dx, dy, s] of [[150, 470, .9], [1000, 470, .9], [70, 540, 1.1], [1090, 540, 1.1]]) { // 机
+      ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(dx + 105 * s, dy + 92 * s, 110 * s, 10, 0, 0, TAU); ctx.fill();
+      vgrad(dx, dy, 210 * s, 20 * s, "#c9a86a", "#a8874d");
+      ctx.fillStyle = "#8a9098";
+      ctx.fillRect(dx + 10 * s, dy + 20 * s, 9, 72 * s); ctx.fillRect(dx + 190 * s, dy + 20 * s, 9, 72 * s);
+    }
+  },
+
+  office(time, t) {
+    vgrad(0, 0, W, 90, "#dde2e8", "#c8cfd8");                                                    // 天井
+    for (const lx of [200, 560, 920]) { ctx.fillStyle = "#f8fbff"; ctx.fillRect(lx - 100, 34, 200, 14); glow(lx, 44, 110, "#eef4ff", .3); }
+    vgrad(0, 90, W, 370, time === "night" ? "#3c4452" : "#e4e9ef", time === "night" ? "#2c3340" : "#cdd5de"); // 壁
+    ctx.fillStyle = "#4c5666"; ctx.fillRect(56, 96, 1168, 12);
+    for (const wx of [70, 470, 870]) {                                                            // 窓×3
+      ctx.fillStyle = "#4c5666"; ctx.fillRect(wx, 104, 340, 268);
+      ctx.fillStyle = skyGrad(time, 112, 366); ctx.fillRect(wx + 8, 112, 324, 252);
+      ctx.save(); ctx.beginPath(); ctx.rect(wx + 8, 112, 324, 252); ctx.clip();
+      drawClouds(t, time, 160);
+      ctx.translate(wx - 420, 20); litBuildings(360, time === "night"); ctx.restore();
+      ctx.fillStyle = "rgba(255,255,255,.35)";                                                    // ブラインド
+      for (let i = 0; i < 5; i++) ctx.fillRect(wx + 8, 112 + i * 9, 324, 4);
+      ctx.fillStyle = "#4c5666"; ctx.fillRect(wx + 164, 112, 10, 252);
+    }
+    vgrad(0, 460, W, H - 460, time === "night" ? "#33404c" : "#8fa0ad", time === "night" ? "#242e38" : "#6c7d8a"); // 床
+    for (const [dx, mir] of [[120, 0], [700, 0]]) {                                                // デスク島
+      ctx.fillStyle = "rgba(0,0,0,.24)"; ctx.beginPath(); ctx.ellipse(dx + 230, 594, 250, 18, 0, 0, TAU); ctx.fill();
+      vgrad(dx, 470, 460, 24, "#aab6c2", "#8c98a5");
+      ctx.fillStyle = "#5c6672"; ctx.fillRect(dx + 20, 494, 12, 86); ctx.fillRect(dx + 428, 494, 12, 86);
+      for (const mx of [dx + 70, dx + 250]) {                                                      // モニター
+        ctx.fillStyle = "#1c2028"; ctx.fillRect(mx, 366, 140, 96);
+        const sc = ctx.createLinearGradient(mx, 372, mx + 130, 456);
+        sc.addColorStop(0, "#5aa0e0"); sc.addColorStop(1, "#2c5a90");
+        ctx.fillStyle = sc; ctx.fillRect(mx + 6, 372, 128, 82);
+        ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.fillRect(mx + 14, 382, 70, 5); ctx.fillRect(mx + 14, 394, 96, 5);
+        ctx.fillStyle = "#1c2028"; ctx.fillRect(mx + 62, 462, 16, 10);
+        ctx.fillStyle = "#2a2e36"; ctx.fillRect(mx + 20, 476, 100, 8);                             // キーボード
+        if (time === "night") glow(mx + 70, 420, 130, "#5a9ad8", .28);
+      }
+    }
+    ctx.fillStyle = "#7a5a3a"; ctx.fillRect(614, 430, 26, 42);                                     // 観葉植物
+    ctx.fillStyle = "#3e7a3e";
+    for (const [px, py, pr] of [[627, 402, 30], [606, 418, 22], [648, 416, 22], [627, 380, 20]]) {
+      ctx.beginPath(); ctx.ellipse(px, py, pr, pr * 1.4, 0, 0, TAU); ctx.fill();
+    }
+  },
+
+  conbini(time, t) {
+    const night = time === "night";
+    ctx.fillStyle = skyGrad(time, 0, 520); ctx.fillRect(0, 0, W, 520);
+    if (night) drawStars(t);
+    drawSunMoon(time, t); drawClouds(t, time, 70);
+    skyline(230, night ? "rgba(14,22,46,.9)" : "rgba(120,145,170,.45)", 4, 40, 120);
+    // 店舗
+    ctx.fillStyle = night ? "#d8d8d2" : "#f4f4ee"; ctx.fillRect(80, 168, 1120, 340);
+    vgrad(80, 150, 1120, 22, "#b8b8b2", "#98988f");                                               // 屋根縁
+    ctx.fillStyle = "#fff"; ctx.fillRect(80, 172, 1120, 62);                                       // 看板
+    ctx.fillStyle = "#e84545"; ctx.fillRect(80, 178, 1120, 15);
+    ctx.fillStyle = "#2e7dd1"; ctx.fillRect(80, 212, 1120, 15);
+    ctx.fillStyle = "#28323c"; ctx.font = "bold 40px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("BBマート 24h", 640, 222); ctx.textAlign = "left";
+    if (night) glow(640, 205, 480, "#fff8d8", .35);
+    // ガラス面と店内
+    for (const [gx, gw] of [[116, 300], [452, 300], [872, 292]]) {
+      const inG = ctx.createLinearGradient(0, 252, 0, 496);
+      inG.addColorStop(0, night ? "#fff6cf" : "#eef6fc"); inG.addColorStop(1, night ? "#ffedb0" : "#dceaf4");
+      ctx.fillStyle = inG; ctx.fillRect(gx, 252, gw, 244);
+      for (let r = 0; r < 3; r++) {                                                                // 商品棚
+        ctx.fillStyle = "#c8cdd4"; ctx.fillRect(gx + 16, 300 + r * 58, gw - 32, 44);
+        for (let i = 0; i < Math.floor((gw - 44) / 26); i++) {
+          ctx.fillStyle = ["#e05a5a", "#e0a13e", "#5aa0e0", "#5ac878", "#b070d0", "#f0e060"][(i + r) % 6];
+          ctx.fillRect(gx + 22 + i * 26, 306 + r * 58, 18, 30);
+        }
+      }
+      ctx.fillStyle = "rgba(255,255,255,.28)";                                                     // ガラス反射
+      ctx.beginPath(); ctx.moveTo(gx + 12, 252); ctx.lineTo(gx + 70, 252); ctx.lineTo(gx + 26, 496); ctx.lineTo(gx, 496); ctx.fill();
+      ctx.strokeStyle = "#9aa4ae"; ctx.lineWidth = 5; ctx.strokeRect(gx, 252, gw, 244);
+    }
+    ctx.fillStyle = "#8a949e"; ctx.fillRect(770, 252, 100, 244);                                   // 自動ドア
+    ctx.fillStyle = night ? "#ffedb8" : "#e4eef6"; ctx.fillRect(778, 260, 84, 228);
+    ctx.fillStyle = "#5a646e"; ctx.fillRect(816, 252, 8, 244);
+    // のぼり
+    ctx.fillStyle = "#4c565e"; ctx.fillRect(180, 340, 5, 172);
+    ctx.fillStyle = "#e8484f"; ctx.fillRect(185, 340, 42, 130);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 17px sans-serif";
+    ctx.fillText("か", 197, 366); ctx.fillText("ら", 197, 388); ctx.fillText("あ", 197, 410); ctx.fillText("げ", 197, 432);
+    // 駐車場
+    vgrad(0, 508, W, H - 508, night ? "#33353c" : "#a2aab2", night ? "#232529" : "#8a929a");
+    ctx.strokeStyle = "rgba(240,240,240,.8)"; ctx.lineWidth = 5;
+    for (const lx of [180, 480, 780, 1080]) { ctx.beginPath(); ctx.moveTo(lx, 522); ctx.lineTo(lx - 70, 706); ctx.stroke(); }
+    if (night) {                                                                                    // 窓明かりが地面に落ちる
+      ctx.fillStyle = "rgba(255,240,180,.14)";
+      ctx.beginPath(); ctx.moveTo(100, 508); ctx.lineTo(1180, 508); ctx.lineTo(1280, 700); ctx.lineTo(0, 700); ctx.fill();
+    }
+  },
+
+  beach(time, t) {
+    ctx.fillStyle = skyGrad(time, 0, 400); ctx.fillRect(0, 0, W, 400);
+    if (time === "night") drawStars(t);
+    drawSunMoon(time, t); drawClouds(t, time, 80);
+    ctx.fillStyle = time === "night" ? "rgba(20,40,70,.8)" : "rgba(80,120,160,.5)";                 // 遠い島
+    ctx.beginPath(); ctx.moveTo(60, 372); ctx.quadraticCurveTo(160, 318, 280, 372); ctx.fill();
+    const sea = ctx.createLinearGradient(0, 366, 0, 540);
+    if (time === "night") { sea.addColorStop(0, "#16375c"); sea.addColorStop(1, "#0a1e38"); }
+    else if (time === "evening") { sea.addColorStop(0, "#c07a5a"); sea.addColorStop(.4, "#4a6a9c"); sea.addColorStop(1, "#2c4a78"); }
+    else { sea.addColorStop(0, "#4aa6d8"); sea.addColorStop(1, "#1d6aa8"); }
+    ctx.fillStyle = sea; ctx.fillRect(0, 366, W, 106);
+    ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.fillRect(0, 364, W, 3);                              // 水平線
+    const lightCol = time === "night" ? "rgba(240,240,215,.3)" : "rgba(255,235,170,.4)";             // 光の道
+    ctx.fillStyle = lightCol;
+    ctx.beginPath(); ctx.moveTo(1060, 368); ctx.lineTo(1130, 368); ctx.lineTo(1190, 470); ctx.lineTo(1010, 470); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 3;                                    // 波
+    for (let r = 0; r < 3; r++) {
+      const wy = 396 + r * 26 + Math.sin(t * 1.6 + r) * 4;
+      ctx.beginPath();
+      for (let x = -40; x < W + 40; x += 70) ctx.quadraticCurveTo(x + 17, wy + 9, x + 35, wy);
+      ctx.stroke();
+    }
+    const wet = 470 + Math.sin(t * 1.2) * 6;                                                         // 濡れた砂
+    vgrad(0, wet, W, 40, time === "night" ? "#5c5340" : "#c2ae86", time === "night" ? "#6b6049" : "#d3bf95");
+    vgrad(0, wet + 34, W, H - wet - 34, time === "night" ? "#7a6c4e" : "#ecd9a8", time === "night" ? "#5c5039" : "#d8c188");
+    ctx.fillStyle = "rgba(120,100,60,.35)";                                                          // 砂の粒
+    for (let i = 0; i < 60; i++) ctx.fillRect((i * 211) % W, wet + 40 + (i * 137) % (H - wet - 50), 3, 3);
+    // ビーチパラソル
+    ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(215, 640, 130, 16, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#e8e2d0"; ctx.fillRect(206, 452, 9, 190);
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i % 2 ? "#e8484f" : "#f4f0e4";
+      ctx.beginPath(); ctx.moveTo(210, 452);
+      ctx.arc(210, 452, 130, Math.PI + i * Math.PI / 6, Math.PI + (i + 1) * Math.PI / 6); ctx.fill();
+    }
+    ctx.fillStyle = "#5aa0d0"; ctx.fillRect(120, 640, 190, 26);                                       // レジャーシート
+    if (time === "day") {
+      ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 3;                                    // カモメ
+      for (const [bx, by] of [[520, 120], [575, 100], [900, 150]]) {
+        const f = Math.sin(t * 6 + bx) * 6;
+        ctx.beginPath(); ctx.moveTo(bx - 16, by + f); ctx.quadraticCurveTo(bx, by - 9, bx + 2, by + f);
+        ctx.quadraticCurveTo(bx + 4, by - 9, bx + 18, by + f); ctx.stroke();
+      }
+    }
+  },
+
+  night_city(time, t) {
+    ctx.fillStyle = skyGrad("night", 0, 430); ctx.fillRect(0, 0, W, 430);
+    drawStars(t); drawSunMoon("night", t);
+    skyline(400, "#0a1024", 7, 100, 240);
+    litBuildings(442, true);
+    // ネオン(明滅)
+    const neon = [["#ff4d88", 130, 190, "焼肉"], ["#4dd2ff", 420, 140, "BAR"], ["#ffe14d", 730, 220, "24h"], ["#7dff6b", 1000, 160, "カラオケ"]];
+    neon.forEach(([c, x, y, txt], i) => {
+      const on = Math.sin(t * 3.1 + i * 2.4) > -0.82;
+      ctx.fillStyle = on ? c : "#2c2c38";
+      ctx.fillRect(x, y, 128, 48);
+      if (on) glow(x + 64, y + 24, 110, c, .5);
+      ctx.fillStyle = on ? "#15151d" : "#4c4c58"; ctx.font = "bold 26px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(txt, x + 64, y + 34); ctx.textAlign = "left";
+    });
+    vgrad(0, 442, W, H - 442, "#1e2028", "#101218");                                                  // 濡れた路面
+    neon.forEach(([c, x], i) => {                                                                      // 路面反射
+      ctx.save(); ctx.globalAlpha = .16 + .06 * Math.sin(t * 3.1 + i * 2.4);
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.moveTo(x + 20, 442); ctx.lineTo(x + 108, 442); ctx.lineTo(x + 150, 720); ctx.lineTo(x - 10, 720); ctx.fill();
+      ctx.restore();
+    });
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    for (let i = 0; i < 14; i++) ctx.fillRect((i * 173) % W, 470 + (i * 89) % 220, 60, 4);            // 路面ハイライト
+    lampPost(80, 468, "night"); lampPost(1200, 468, "night");
   },
 };
 
@@ -425,6 +785,9 @@ function drawActor(a, x, speaking, emotion, t) {
   const jump = (speaking && emotion === "shock") ? Math.max(0, Math.sin(t * 6)) * 26 : 0;
   const hBase = 360 * (speaking ? 1.06 : 1);
   const y0 = STAGE_FLOOR - bob - jump;
+  // 接地影
+  ctx.fillStyle = "rgba(0,0,0,.3)";
+  ctx.beginPath(); ctx.ellipse(x, STAGE_FLOOR + 4, hBase * .22, 13, 0, 0, TAU); ctx.fill();
   ctx.save();
   if (!speaking) ctx.filter = "brightness(0.62)";
   if (a._img) {
@@ -434,7 +797,7 @@ function drawActor(a, x, speaking, emotion, t) {
   } else {  // プレースホルダー(シルエット人形)
     const h = hBase * 0.92, headR = h * 0.19;
     ctx.fillStyle = a.color;
-    ctx.beginPath(); ctx.arc(x + shake, y0 - h + headR, headR, 0, 7); ctx.fill();       // 頭
+    ctx.beginPath(); ctx.arc(x + shake, y0 - h + headR, headR, 0, TAU); ctx.fill();     // 頭
     ctx.beginPath();                                                                     // 体
     ctx.moveTo(x - h * 0.22 + shake, y0);
     ctx.quadraticCurveTo(x + shake, y0 - h * 0.95, x + h * 0.22 + shake, y0);
@@ -454,7 +817,7 @@ function drawActor(a, x, speaking, emotion, t) {
       ctx.moveTo(fx + headR * .55, fy - 12); ctx.lineTo(fx + headR * .15, fy - 2); ctx.stroke(); ctx.restore();
       ctx.fillRect(fx - 10, fy + headR * .35, 20, 6);
     } else {
-      ctx.beginPath(); ctx.arc(fx - headR * .38, fy - 2, 5, 0, 7); ctx.arc(fx + headR * .38, fy - 2, 5, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(fx - headR * .38, fy - 2, 5, 0, TAU); ctx.arc(fx + headR * .38, fy - 2, 5, 0, TAU); ctx.fill();
       ctx.fillRect(fx - 9, fy + headR * .4, 18, 5);
     }
   }
@@ -488,6 +851,10 @@ const MOODS = {
   horror:    { bpm: 60,  bass: "sine",     lead: "sine",     drums: false, leadG: .05, drone: [33, 39],
                prog: [[69,75],[68,74],[69,75],[70,76]], arp: [-1,-1,0,-1,-1,1,-1,-1] },
 };
+const MOOD_COLORS = { comical: "#ffcc4d", daily: "#7dd87d", tense: "#ff6b6b", sad: "#6b8cff",
+                      epic: "#ff9a3d", heartwarm: "#ff9ad5", horror: "#9d6bff" };
+const MOOD_LABELS = { comical: "コミカル", daily: "日常", tense: "緊迫", sad: "悲哀",
+                      epic: "決戦", heartwarm: "ほのぼの", horror: "ホラー" };
 
 const bgm = {
   ctx: null, master: null, seGain: null, recDest: null,
@@ -598,10 +965,37 @@ const state = {
   playing: false, phase: "idle",   // idle | typing | holding | transition | end
   holdT: 0, fade: 0, fadeDir: 0, pendingScene: 0,
   auto: true, recording: false, t: 0, lastTs: 0, endT: 0,
+  overrides: [],                   // BGM上書き区間 [{from,to,mood}](flat行index)
 };
 
 function curScene() { return state.story ? state.story.scenes[state.sc] : null; }
 function curLine() { const s = curScene(); return s ? s.lines[state.ln] : null; }
+
+/* --- flat行index(タイムライン座標) --- */
+function totalLines() {
+  return state.story ? state.story.scenes.reduce((a, s) => a + s.lines.length, 0) : 0;
+}
+function flatIndex(sc, ln) {
+  let n = 0;
+  for (let i = 0; i < sc; i++) n += state.story.scenes[i].lines.length;
+  return n + ln;
+}
+function fromFlat(flat) {
+  let n = flat;
+  for (let i = 0; i < state.story.scenes.length; i++) {
+    const len = state.story.scenes[i].lines.length;
+    if (n < len) return { sc: i, ln: n };
+    n -= len;
+  }
+  const last = state.story.scenes.length - 1;
+  return { sc: last, ln: state.story.scenes[last].lines.length - 1 };
+}
+function moodAt(flat) {
+  let m = state.story.scenes[fromFlat(flat).sc].bgm;
+  for (const o of state.overrides) if (flat >= o.from && flat <= o.to) m = o.mood;
+  return m;
+}
+function applyMoodNow() { bgm.setMood(moodAt(flatIndex(state.sc, state.ln))); }
 
 function startScene(idx, withFade) {
   state.pendingScene = idx;
@@ -610,8 +1004,7 @@ function startScene(idx, withFade) {
 }
 function applyScene(idx) {
   state.sc = idx; state.ln = 0; state.shown = 0;
-  const s = curScene();
-  if (s) bgm.setMood(s.bgm);
+  applyMoodNow();
   renderScriptList();
   if (state.fadeDir > 0) {
     state.fadeDir = -1;              // phase は transition のまま、フェードインへ
@@ -623,7 +1016,8 @@ function applyScene(idx) {
 function nextLine() {
   const s = curScene(); if (!s) return;
   if (state.ln + 1 < s.lines.length) {
-    state.ln++; state.shown = 0; state.phase = "typing"; bgm.pop();
+    state.ln++; state.shown = 0; state.phase = "typing";
+    applyMoodNow(); bgm.pop();
   } else if (state.sc + 1 < state.story.scenes.length) {
     startScene(state.sc + 1, true);
   } else {
@@ -631,6 +1025,14 @@ function nextLine() {
     setTimeout(() => bgm.stop(), 1800);
     if (state.recording) setTimeout(stopRecording, 2400);
   }
+}
+function jumpToFlat(flat) {
+  if (!state.story) return;
+  const { sc, ln } = fromFlat(Math.max(0, Math.min(totalLines() - 1, flat)));
+  state.sc = sc; state.ln = ln; state.shown = 0;
+  state.fade = 0; state.fadeDir = 0;
+  state.phase = "typing"; state.playing = true;
+  applyMoodNow(); bgm.pop(); renderScriptList(); updatePlayBtn();
 }
 function advance() {   // クリック/次へボタン
   if (!state.story || state.phase === "transition" || state.phase === "end") return;
@@ -645,6 +1047,7 @@ function frame(ts) {
   state.lastTs = ts; state.t += dt;
   update(dt);
   draw();
+  updatePlayhead();
   requestAnimationFrame(frame);
 }
 
@@ -688,7 +1091,7 @@ function draw() {
   ctx.clearRect(0, 0, W, H);
   if (!state.story) { drawTitleScreen(); return; }
   const scene = curScene();
-  (BG_DRAW[scene.background] || BG_DRAW.park)(scene.time);
+  (BG_DRAW[scene.background] || BG_DRAW.park)(scene.time, state.t);
 
   // 出演キャラ(このシーンの話者全員)
   const names = [...new Set(scene.lines.map(l => l.speaker).filter(s => s && s !== "ナレーション"))];
@@ -699,6 +1102,7 @@ function draw() {
     drawActor(getActor(n), x, speaking, speaking ? line.emotion : "normal", state.t);
   });
 
+  vignette();
   drawDialog(line);
 
   if (state.phase === "transition" || state.fade > 0) {                  // 場面転換フェード
@@ -710,9 +1114,11 @@ function draw() {
 function drawDialog(line) {
   if (!line || state.phase === "end") return;
   const { x, y, w, h } = DLG;
-  ctx.fillStyle = "rgba(12,14,24,0.82)";
+  const box = ctx.createLinearGradient(0, y, 0, y + h);
+  box.addColorStop(0, "rgba(16,18,30,.88)"); box.addColorStop(1, "rgba(8,9,18,.92)");
+  ctx.fillStyle = box;
   roundRect(x, y, w, h, 14); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 3;
   roundRect(x + 4, y + 4, w - 8, h - 8, 11); ctx.stroke();
 
   const isNarr = line.speaker === "ナレーション";
@@ -720,6 +1126,8 @@ function drawDialog(line) {
     const a = getActor(line.speaker);
     ctx.font = "bold 26px sans-serif";
     const nw = ctx.measureText(line.speaker).width + 36;
+    ctx.fillStyle = "rgba(0,0,0,.4)";
+    roundRect(x + 27, y - 19, nw, 44, 9); ctx.fill();
     ctx.fillStyle = a.color || "#888";
     roundRect(x + 24, y - 22, nw, 44, 9); ctx.fill();
     ctx.fillStyle = "#15171f";
@@ -745,12 +1153,13 @@ function drawTitleScreen() {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#1a1e2e"); g.addColorStop(1, "#0d0f18");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  drawStars(state.t);
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffcc4d"; ctx.font = "bold 64px sans-serif";
   ctx.fillText("🎬 BB劇場メーカー", W / 2, 260);
   ctx.fillStyle = "#9aa1b5"; ctx.font = "26px sans-serif";
-  ctx.fillText("右のパネルでキャラを登録して「AIで物語を自動作成」を押してください", W / 2, 340);
-  ctx.fillText("(まずは「サンプル劇場」でお試しできます)", W / 2, 390);
+  ctx.fillText("右のパネルでキャラを登録して物語を作ってください", W / 2, 340);
+  ctx.fillText("(「📚 内蔵脚本ガチャ」ならすぐ上演できます)", W / 2, 390);
   ctx.textAlign = "left";
 }
 
@@ -773,25 +1182,132 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
+/* ---------------- タイムライン(シークバー+BGM区間上書き) ---------------- */
+const tlBar = document.getElementById("tlBar");
+const tlSel = document.getElementById("tlSel");
+const tlHead = document.getElementById("tlHead");
+const tlOv = document.getElementById("tlOverrides");
+let tlDrag = null;                    // {startFrac, curFrac}
+let tlSelection = null;               // {from, to}(flat行index)
+
+function renderTimeline() {
+  [...tlBar.querySelectorAll(".seg")].forEach(el => el.remove());
+  tlOv.innerHTML = "";
+  if (!state.story) { tlSel.style.display = "none"; return; }
+  const total = totalLines();
+  let acc = 0;
+  state.story.scenes.forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "seg";
+    div.style.left = (acc / total * 100) + "%";
+    div.style.width = (s.lines.length / total * 100) + "%";
+    div.style.background = MOOD_COLORS[s.bgm] || "#888";
+    div.textContent = `S${i + 1} ${MOOD_LABELS[s.bgm] || s.bgm}`;
+    tlBar.insertBefore(div, tlSel);
+    acc += s.lines.length;
+  });
+  for (const o of state.overrides) {
+    const div = document.createElement("div");
+    div.className = "ov";
+    div.style.left = (o.from / total * 100) + "%";
+    div.style.width = ((o.to - o.from + 1) / total * 100) + "%";
+    div.style.background = MOOD_COLORS[o.mood];
+    div.textContent = MOOD_LABELS[o.mood];
+    div.title = "クリックで削除";
+    div.addEventListener("click", () => {
+      state.overrides = state.overrides.filter(x => x !== o);
+      saveOverrides(); renderTimeline();
+      if (state.story && state.phase !== "end") applyMoodNow();
+    });
+    tlOv.appendChild(div);
+  }
+  renderSelection();
+}
+function renderSelection() {
+  if (!tlSelection || !state.story) {
+    tlSel.style.display = "none";
+    document.getElementById("selRangeInfo").textContent = "区間未選択";
+    document.getElementById("btnOvApply").disabled = true;
+    return;
+  }
+  const total = totalLines();
+  tlSel.style.display = "block";
+  tlSel.style.left = (tlSelection.from / total * 100) + "%";
+  tlSel.style.width = ((tlSelection.to - tlSelection.from + 1) / total * 100) + "%";
+  document.getElementById("selRangeInfo").textContent =
+    `選択中: ${tlSelection.from + 1}行目 〜 ${tlSelection.to + 1}行目`;
+  document.getElementById("btnOvApply").disabled = false;
+}
+function updatePlayhead() {
+  if (!state.story) { tlHead.style.left = "0%"; return; }
+  const frac = (flatIndex(state.sc, state.ln) + Math.min(1, state.shown / Math.max(1, (curLine() || { text: " " }).text.length))) / totalLines();
+  tlHead.style.left = (Math.min(1, frac) * 100) + "%";
+}
+function fracFromEvent(e) {
+  const r = tlBar.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+}
+tlBar.addEventListener("pointerdown", e => {
+  if (!state.story) return;
+  tlBar.setPointerCapture(e.pointerId);
+  tlDrag = { startFrac: fracFromEvent(e), curFrac: fracFromEvent(e) };
+});
+tlBar.addEventListener("pointermove", e => {
+  if (!tlDrag || !state.story) return;
+  tlDrag.curFrac = fracFromEvent(e);
+  const total = totalLines();
+  const a = Math.floor(Math.min(tlDrag.startFrac, tlDrag.curFrac) * total);
+  const b = Math.min(total - 1, Math.floor(Math.max(tlDrag.startFrac, tlDrag.curFrac) * total));
+  tlSelection = { from: Math.min(a, total - 1), to: b };
+  renderSelection();
+});
+tlBar.addEventListener("pointerup", e => {
+  if (!tlDrag || !state.story) { tlDrag = null; return; }
+  const endFrac = fracFromEvent(e);
+  const moved = Math.abs(endFrac - tlDrag.startFrac);
+  const total = totalLines();
+  if (moved < 0.012) {                                    // クリック=シーク
+    tlSelection = null; renderSelection();
+    userGesture(); jumpToFlat(Math.floor(endFrac * total));
+  }
+  tlDrag = null;
+});
+document.getElementById("btnOvApply").addEventListener("click", () => {
+  if (!tlSelection) return;
+  userGesture();
+  state.overrides.push({ ...tlSelection, mood: document.getElementById("selOvMood").value });
+  tlSelection = null;
+  saveOverrides(); renderTimeline();
+  if (state.story && state.phase !== "end") applyMoodNow();
+});
+document.getElementById("btnOvClear").addEventListener("click", () => {
+  state.overrides = []; tlSelection = null;
+  saveOverrides(); renderTimeline();
+  if (state.story && state.phase !== "end") applyMoodNow();
+});
+function saveOverrides() {
+  try { localStorage.setItem("bb_overrides", JSON.stringify(state.overrides)); } catch (e) {}
+}
+
 /* ---------------- 台本リスト ---------------- */
+const BG_NAMES = { room: "部屋", park: "公園", street: "商店街", school: "教室", office: "オフィス",
+                   conbini: "コンビニ", beach: "海辺", night_city: "夜の街" };
 function renderScriptList() {
   const box = document.getElementById("scriptList");
   if (!state.story) { box.innerHTML = '<span class="hint">まだ台本がありません</span>'; return; }
   box.innerHTML = "";
-  const bgNames = { room: "部屋", park: "公園", street: "路上", school: "教室", office: "オフィス",
-                    conbini: "コンビニ", beach: "海辺", night_city: "夜の街" };
   state.story.scenes.forEach((s, i) => {
     const div = document.createElement("div");
     div.className = "sc" + (i === state.sc ? " now" : "");
     const first = s.lines[0] ? `${s.lines[0].speaker}「${s.lines[0].text.slice(0, 22)}…」` : "";
-    div.innerHTML = `<b>シーン${i + 1}</b> <span class="meta">📍${bgNames[s.background] || s.background} / 🎵${s.bgm}</span><br>${escapeHtml(first)}`;
+    div.innerHTML = `<b>シーン${i + 1}</b> <span class="meta">📍${BG_NAMES[s.background] || s.background} / 🎵${MOOD_LABELS[s.bgm] || s.bgm}</span><br>${escapeHtml(first)}`;
     div.addEventListener("click", () => { userGesture(); startScene(i, true); state.playing = true; updatePlayBtn(); });
     box.appendChild(div);
   });
 }
 function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
-/* ---------------- 物語生成 ---------------- */
+/* ---------------- 物語生成(AI) ---------------- */
 const genStatus = document.getElementById("genStatus");
 
 async function generateStory() {
@@ -799,7 +1315,7 @@ async function generateStory() {
   if (!chars.length) return alert("キャラクターを1人以上登録してください");
   const btn = document.getElementById("btnGenerate");
   btn.disabled = true;
-  genStatus.className = ""; genStatus.textContent = "🤖 AIが台本を執筆中…(1〜2分かかることがあります)";
+  genStatus.className = ""; genStatus.textContent = "🤖 Fable 5 が台本を思考中…(1〜2分かかることがあります)";
   try {
     const res = await fetch("/api/story", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -826,7 +1342,7 @@ async function generateStory() {
   } catch (e) {
     genStatus.className = "err";
     genStatus.textContent = "⚠ 生成に失敗しました: " + e.message +
-      "\nサーバー側の ANTHROPIC_API_KEY 設定を確認するか、「サンプル劇場」をお試しください。";
+      "\nサーバー側の ANTHROPIC_API_KEY 設定を確認するか、「内蔵脚本ガチャ」をお試しください。";
   } finally {
     btn.disabled = false;
   }
@@ -834,60 +1350,179 @@ async function generateStory() {
 
 function loadStory(story) {
   state.story = story;
+  state.overrides = [];
+  saveOverrides();
   try { localStorage.setItem("bb_story", JSON.stringify(story)); } catch (e) {}
   userGesture();
   state.playing = true;
   state.phase = "idle";
+  state.fade = 0; state.fadeDir = 0;
   startScene(0, false);
+  renderTimeline();
   updatePlayBtn();
 }
 
-/* API キーなしでも試せるサンプル台本 */
-function sampleStory() {
-  const A = (characters[0] && characters[0].name.trim()) || "先輩";
-  const B = (characters[1] && characters[1].name.trim()) || "後輩";
-  return {
-    title: `${A}と${B}の限界アイス戦争`,
-    scenes: [
-      { background: "room", time: "day", bgm: "daily", lines: [
-        { speaker: "ナレーション", text: "8月。うだるような暑さのアパートの一室。", emotion: "normal" },
-        { speaker: A, text: `あー、暑い。こういう時は冷凍庫のアイスに限るんだよなあ。`, emotion: "happy" },
-        { speaker: A, text: `…ん? ないんだけど。僕のアイス、ないんだけど(半ギレ)`, emotion: "angry" },
-        { speaker: B, text: `うわ、${A}さんチーッス! 今日も元気っスね!`, emotion: "happy" },
-        { speaker: A, text: `口の周りにチョコついてるゾ。`, emotion: "smug" },
-        { speaker: B, text: `!?`, emotion: "shock" },
-      ]},
-      { background: "conbini", time: "evening", bgm: "comical", lines: [
-        { speaker: "ナレーション", text: "弁明の機会も与えられず、後輩は買い直しを命じられた。", emotion: "normal" },
-        { speaker: B, text: `同じアイス買えばセーフっしょ! オレ天才っス!`, emotion: "happy" },
-        { speaker: B, text: `…え、財布がない。ウソだろ、家に置いてきた?`, emotion: "shock" },
-        { speaker: A, text: `(ガラス越しにこっちを見ている)`, emotion: "smug" },
-        { speaker: B, text: `み、見られてる…! 気まずさで店内3周目に突入っス…!`, emotion: "sad" },
-      ]},
-      { background: "night_city", time: "night", bgm: "tense", lines: [
-        { speaker: "ナレーション", text: "閉店間際。最後の1個をめぐり、謎の争奪戦が始まった。", emotion: "normal" },
-        { speaker: A, text: `おっ、そのアイス、ラス1じゃん。悪いけど僕が買うから。`, emotion: "smug" },
-        { speaker: B, text: `いや、それを買って返すのがオレの誠意なんスよ! 渡さないっス!`, emotion: "angry" },
-        { speaker: A, text: `お前、財布は?`, emotion: "normal" },
-        { speaker: B, text: `……${A}さん、立て替えお願いするっス。`, emotion: "sad" },
-        { speaker: A, text: `誠意とは一体…うごごご!`, emotion: "shock" },
-      ]},
-      { background: "park", time: "night", bgm: "heartwarm", lines: [
-        { speaker: "ナレーション", text: "結局アイスは2人で半分こ。夏の夜風がやさしい。", emotion: "normal" },
-        { speaker: B, text: `${A}さん、なんかスンマセンした。今度バイト代で倍返しするっス。`, emotion: "sad" },
-        { speaker: A, text: `いいよ、来いよ。来月も再来月も、ウチの冷凍庫にアイス補充しに。`, emotion: "happy" },
-        { speaker: B, text: `それ実質無限アイス係じゃないっスか!?`, emotion: "shock" },
-        { speaker: "ナレーション", text: "こうして後輩は永久アイス係に任命された。完。", emotion: "normal" },
-      ]},
-    ],
-  };
+/* ================ 内蔵脚本ライブラリ(Fable 5 書き下ろし) ================
+ * %A% = 1人目のキャラ(ツッコミ推奨) / %B% = 2人目のキャラ(ボケ推奨)
+ * 各話とも「フリ→天丼→回収」の三段構造で設計してある。
+ * ==================================================================== */
+const STORY_LIBRARY = [
+{
+  title: "%B%と恐竜と、粉々の300分の1",
+  scenes: [
+    { background: "room", time: "day", bgm: "daily", lines: [
+      { speaker: "ナレーション", text: "%A%の部屋。机の上に、粉々になった限定フィギュアがあった。", emotion: "normal" },
+      { speaker: "ナレーション", text: "全世界300体限定。抽選倍率241倍。%A%の魂の3割である。", emotion: "normal" },
+      { speaker: "%A%", text: "…おい。僕のフィギュアが粉々なんだけど。", emotion: "shock" },
+      { speaker: "%B%", text: "奇遇っスね!オレもさっき見て驚いてたとこっス!", emotion: "happy" },
+      { speaker: "%A%", text: "本当に驚いた人間は「奇遇」から入らないんだよなあ。", emotion: "normal" },
+      { speaker: "%B%", text: "……。", emotion: "shock" },
+    ]},
+    { background: "room", time: "day", bgm: "tense", lines: [
+      { speaker: "ナレーション", text: "取り調べが始まった。容疑者は素直に真相を語り始めた。", emotion: "normal" },
+      { speaker: "%B%", text: "実は11時ごろ、この部屋に…恐竜が出たんスよ。", emotion: "normal" },
+      { speaker: "%A%", text: "ほう。恐竜。", emotion: "normal" },
+      { speaker: "%B%", text: "そいつの尻尾がフィギュアに当たって…オレは素手で戦ったんス。", emotion: "angry" },
+      { speaker: "%A%", text: "素手で恐竜と戦ったお前が、なんで無傷なんだよ(半ギレ)", emotion: "angry" },
+      { speaker: "%B%", text: "…向こうが、大人の対応をしてくれたんで…。", emotion: "sad" },
+      { speaker: "%A%", text: "恐竜の方が大人なの、この部屋で一番悲しい話だろ。", emotion: "smug" },
+    ]},
+    { background: "park", time: "evening", bgm: "sad", lines: [
+      { speaker: "ナレーション", text: "証言に詰まった容疑者は、公園で夕日に染まっていた。", emotion: "normal" },
+      { speaker: "%B%", text: "…正直に言うっス。掃除してたら、肘が当たったんス。", emotion: "sad" },
+      { speaker: "%B%", text: "300体限定なんて、もうどこにも売ってないのに…。", emotion: "sad" },
+      { speaker: "%A%", text: "知ってた。", emotion: "normal" },
+      { speaker: "%B%", text: "え。", emotion: "shock" },
+      { speaker: "%A%", text: "箱にお前の肘の跡がくっきり付いてたんだよなあ。型が取れるレベルで。", emotion: "smug" },
+      { speaker: "%B%", text: "オレの肘、証拠能力高すぎっス…。", emotion: "sad" },
+    ]},
+    { background: "room", time: "night", bgm: "heartwarm", lines: [
+      { speaker: "ナレーション", text: "その夜。%A%は無言で押し入れの奥から箱を取り出した。", emotion: "normal" },
+      { speaker: "%A%", text: "ほら。予備。", emotion: "normal" },
+      { speaker: "%B%", text: "2体持ってたんスか!? 300体限定を!? 241倍を2回!?", emotion: "shock" },
+      { speaker: "%A%", text: "運も実力なんだよなあ。…で、これは先月の詫びだ。受け取れ。", emotion: "smug" },
+      { speaker: "%B%", text: "詫び? 何のっスか?", emotion: "normal" },
+      { speaker: "%A%", text: "お前のゲーム機を壊したの、僕。", emotion: "normal" },
+      { speaker: "%B%", text: "アレ「恐竜が出た」って言ってたじゃないっスか!!", emotion: "shock" },
+      { speaker: "ナレーション", text: "この部屋には、恐竜がよく出る。完。", emotion: "normal" },
+    ]},
+  ],
+},
+{
+  title: "深夜2時のからあげ聖戦",
+  scenes: [
+    { background: "conbini", time: "night", bgm: "daily", lines: [
+      { speaker: "ナレーション", text: "深夜2時のコンビニ。ホットスナックの棚に、最後のからあげ棒が1本。", emotion: "normal" },
+      { speaker: "%A%", text: "あ。", emotion: "normal" },
+      { speaker: "%B%", text: "あ。", emotion: "normal" },
+      { speaker: "ナレーション", text: "2本の手が、同時に伸びた。戦争である。", emotion: "normal" },
+      { speaker: "%A%", text: "僕は昼から何も食べてない。優先権はこっちにあるんだよなあ。", emotion: "normal" },
+      { speaker: "%B%", text: "オレは3日前からからあげのことしか考えてないっス。愛の年季が違うっスよ。", emotion: "angry" },
+      { speaker: "%A%", text: "気持ち悪いなあ(直球)", emotion: "smug" },
+    ]},
+    { background: "conbini", time: "night", bgm: "tense", lines: [
+      { speaker: "ナレーション", text: "交渉は決裂。両者、棚の前から一歩も動かない。", emotion: "normal" },
+      { speaker: "%B%", text: "じゃんけんっスか? 言っとくスけどオレ、じゃんけん強いっスよ。", emotion: "smug" },
+      { speaker: "%A%", text: "お前は手を出す前に口が「パー」って言うから弱いんだよなあ。", emotion: "normal" },
+      { speaker: "%B%", text: "パ…ッ、なんでバレて…!?", emotion: "shock" },
+      { speaker: "ナレーション", text: "レジの店員は、そっと目をそらした。時給1050円で見ていい光景ではない。", emotion: "normal" },
+    ]},
+    { background: "conbini", time: "night", bgm: "horror", lines: [
+      { speaker: "ナレーション", text: "その時。店内の照明が、ふっ、と落ちた。", emotion: "normal" },
+      { speaker: "%B%", text: "ひっ…な、なんスかこれ…!", emotion: "shock" },
+      { speaker: "%A%", text: "…おい。からあげ棒が消えてる。棚から。", emotion: "shock" },
+      { speaker: "%B%", text: "まさか…オレたち以外の、第三の飢えた客…!?", emotion: "shock" },
+      { speaker: "ナレーション", text: "店内放送『照明点検中です。ご迷惑をおかけします』", emotion: "normal" },
+      { speaker: "ナレーション", text: "明かりが戻ると、からあげ棒は店員の手の中にあった。", emotion: "normal" },
+      { speaker: "店員", text: "廃棄の時間なので。", emotion: "normal" },
+      { speaker: "%A%", text: "は?", emotion: "shock" },
+    ]},
+    { background: "street", time: "night", bgm: "epic", lines: [
+      { speaker: "ナレーション", text: "廃棄袋を抱えた店員(時給1050円)との、深夜の追走劇が幕を開けた。", emotion: "normal" },
+      { speaker: "%A%", text: "待てェ! それはまだ食べ物だろ!", emotion: "angry" },
+      { speaker: "店員", text: "廃棄を渡すと本部に怒られるんです!すみません!", emotion: "sad" },
+      { speaker: "%B%", text: "店員さん足はっや!! 何なんスかあの走り、陸上部っスか!?", emotion: "shock" },
+      { speaker: "店員", text: "元・駅伝で山登ってました!", emotion: "normal" },
+      { speaker: "%A%", text: "山の神が深夜のコンビニで何してるんだよ!!", emotion: "angry" },
+      { speaker: "%B%", text: "あの、普通に、売ってもらえばよくないっスか。金で。", emotion: "normal" },
+      { speaker: "店員", text: "あ、それなら大丈夫です。", emotion: "happy" },
+      { speaker: "ナレーション", text: "戦争、終結。走行距離1.2km。", emotion: "normal" },
+    ]},
+    { background: "park", time: "night", bgm: "heartwarm", lines: [
+      { speaker: "ナレーション", text: "公園のベンチ。1本のからあげ棒を3等分した男たちがいた。", emotion: "normal" },
+      { speaker: "%B%", text: "…なんか、思ったよりしょっぱいっスね、これ。", emotion: "sad" },
+      { speaker: "%A%", text: "1.2km走った汗の味なんだよなあ。", emotion: "normal" },
+      { speaker: "店員", text: "私、まだ勤務中なんですけど。", emotion: "sad" },
+      { speaker: "ナレーション", text: "翌日、その店のからあげ棒は3本入荷になった。世界は少し優しい。完。", emotion: "normal" },
+    ]},
+  ],
+},
+{
+  title: "ここが無人島だとしたら(公園)",
+  scenes: [
+    { background: "park", time: "day", bgm: "daily", lines: [
+      { speaker: "ナレーション", text: "よく晴れた昼下がりの公園で、%B%は突然言った。", emotion: "normal" },
+      { speaker: "%B%", text: "%A%さん。もし、ここが無人島だったらどうするっスか。", emotion: "normal" },
+      { speaker: "%A%", text: "公園だが。", emotion: "normal" },
+      { speaker: "%B%", text: "「もしも」の話っスよ! 現代人のサバイバル能力、試されてるっス!", emotion: "angry" },
+      { speaker: "%A%", text: "試してくるの、大体お前なんだよなあ。", emotion: "normal" },
+      { speaker: "ナレーション", text: "こうして誰も頼んでいないサバイバル生活が始まった。", emotion: "normal" },
+    ]},
+    { background: "park", time: "day", bgm: "comical", lines: [
+      { speaker: "%B%", text: "まず水の確保っス! …見つけたっス、あの澄み切った泉!", emotion: "happy" },
+      { speaker: "%A%", text: "水飲み場な。蛇口付いてるだろ。", emotion: "normal" },
+      { speaker: "%B%", text: "次は食料! この森の恵み…木の実を採取するっス!", emotion: "happy" },
+      { speaker: "%A%", text: "どんぐりな。あと隣の犬がすごい目でこっち見てる。", emotion: "normal" },
+      { speaker: "%B%", text: "住居も作るっス! 天然の洞窟を発見したっス!", emotion: "happy" },
+      { speaker: "%A%", text: "土管な。それ公園の遊具な。", emotion: "smug" },
+      { speaker: "ナレーション", text: "無人島(公園)は、今日も設備が充実している。", emotion: "normal" },
+    ]},
+    { background: "park", time: "evening", bgm: "epic", lines: [
+      { speaker: "ナレーション", text: "夕刻。%B%の食料(どんぐり8個)を狙う、獰猛な野生の群れが襲来した。", emotion: "normal" },
+      { speaker: "%B%", text: "ハトっス!! ハトの大群っス!! 目が本気っス!!", emotion: "shock" },
+      { speaker: "%A%", text: "お前が餌付けするからだよ。", emotion: "normal" },
+      { speaker: "%B%", text: "%A%さん、先に行くっス! オレのことはいいから!!", emotion: "angry" },
+      { speaker: "%A%", text: "いや普通に歩いて帰れるが。徒歩30秒にコンビニあるが。", emotion: "normal" },
+      { speaker: "ナレーション", text: "どんぐりは、全て奪われた。守りたかったものは何一つ守れなかった。", emotion: "normal" },
+    ]},
+    { background: "street", time: "evening", bgm: "sad", lines: [
+      { speaker: "ナレーション", text: "帰り道。敗残兵がとぼとぼと商店街を歩く。", emotion: "normal" },
+      { speaker: "%B%", text: "無人島生活8時間…オレたち、何も得られなかったっスね…。", emotion: "sad" },
+      { speaker: "%A%", text: "お前がどんぐり食おうとして吐いたのが唯一の収穫だな。", emotion: "normal" },
+      { speaker: "%B%", text: "無人島って、厳しいんスね…。", emotion: "sad" },
+      { speaker: "%A%", text: "公園だが。", emotion: "normal" },
+    ]},
+    { background: "room", time: "night", bgm: "heartwarm", lines: [
+      { speaker: "ナレーション", text: "帰宅後。カップ麺をすすりながら、%B%はふと言った。", emotion: "normal" },
+      { speaker: "%B%", text: "でも%A%さん、なんだかんだ最後まで付き合ってくれたじゃないっスか。なんでっスか。", emotion: "normal" },
+      { speaker: "%A%", text: "……無人島なら、置いていくわけにいかないんだよなあ。", emotion: "smug" },
+      { speaker: "%B%", text: "%A%さん…! 公園って言わなかったっスね、今!", emotion: "happy" },
+      { speaker: "%A%", text: "言い忘れただけ。", emotion: "normal" },
+      { speaker: "ナレーション", text: "なお翌週、2人は「もしここが火星だったら」を開始した。完。", emotion: "normal" },
+    ]},
+  ],
+},
+];
+
+let gachaIdx = -1;
+function gachaStory() {
+  const names = characters.filter(c => c.name.trim()).map(c => c.name.trim());
+  if (!names.length) return alert("キャラクターを1人以上登録してください");
+  const A = names[0], B = names[1] || "謎の男";
+  gachaIdx = (gachaIdx + 1 + Math.floor(Math.random() * (STORY_LIBRARY.length - 1))) % STORY_LIBRARY.length;
+  const story = JSON.parse(
+    JSON.stringify(STORY_LIBRARY[gachaIdx]).replaceAll("%A%", A).replaceAll("%B%", B)
+  );
+  loadStory(story);
+  genStatus.className = "";
+  genStatus.textContent = `📚 「${story.title}」を上演します(内蔵脚本 ${gachaIdx + 1}/${STORY_LIBRARY.length})`;
 }
 
 /* ---------------- 録画(動画ダウンロード) ---------------- */
 let recorder = null, recChunks = [];
 
 function startRecording() {
-  if (!state.story) return alert("先に物語を作成(またはサンプル劇場を読み込み)してください");
+  if (!state.story) return alert("先に物語を作成(または内蔵脚本ガチャを読み込み)してください");
   if (state.recording) return;
   userGesture();
   const vs = canvas.captureStream(30);
@@ -918,6 +1553,7 @@ function startRecording() {
   // 最初から自動上演して、終劇後に自動で保存される
   state.auto = true; document.getElementById("chkAuto").checked = true;
   state.playing = true; state.phase = "idle";
+  state.fade = 0; state.fadeDir = 0;
   startScene(0, false);
   updatePlayBtn();
 }
@@ -937,7 +1573,7 @@ function updatePlayBtn() {
   document.getElementById("btnPlay").textContent = state.playing ? "⏸ 一時停止" : "▶ 上演";
 }
 document.getElementById("btnPlay").addEventListener("click", () => {
-  if (!state.story) return alert("まだ物語がありません。「AIで物語を自動作成」か「サンプル劇場」を押してください");
+  if (!state.story) return alert("まだ物語がありません。「AIで物語を自動作成」か「内蔵脚本ガチャ」を押してください");
   userGesture();
   state.playing = !state.playing;
   if (state.playing && state.phase === "idle") startScene(0, false);
@@ -945,15 +1581,25 @@ document.getElementById("btnPlay").addEventListener("click", () => {
 });
 document.getElementById("btnRestart").addEventListener("click", () => {
   if (!state.story) return;
-  userGesture(); state.playing = true; state.phase = "idle"; startScene(0, false); updatePlayBtn();
+  userGesture(); state.playing = true; state.phase = "idle";
+  state.fade = 0; state.fadeDir = 0;
+  startScene(0, false); updatePlayBtn();
 });
 document.getElementById("btnNext").addEventListener("click", () => { userGesture(); state.playing = true; advance(); updatePlayBtn(); });
 canvas.addEventListener("click", () => { if (state.recording) return; userGesture(); state.playing = true; advance(); updatePlayBtn(); });
 document.getElementById("chkAuto").addEventListener("change", e => { state.auto = e.target.checked; });
 document.getElementById("btnGenerate").addEventListener("click", () => { userGesture(); generateStory(); });
-document.getElementById("btnSample").addEventListener("click", () => { loadStory(sampleStory()); genStatus.className = ""; genStatus.textContent = "サンプル劇場を上演します"; });
+document.getElementById("btnSample").addEventListener("click", () => { userGesture(); gachaStory(); });
 document.getElementById("btnRecord").addEventListener("click", startRecording);
 document.getElementById("btnRecStop").addEventListener("click", stopRecording);
+
+if (STANDALONE) {
+  document.getElementById("btnGenerate").style.display = "none";
+  document.getElementById("inpTheme").parentElement.style.display = "none";
+  document.querySelector("label.inline:has(#selScenes)")?.style.setProperty("display", "none");
+  document.getElementById("genHint").textContent =
+    "この体験版は Fable 5 が書き下ろした内蔵脚本を上演します(通信なしで動作)。フル版はサーバーの ANTHROPIC_API_KEY を設定すると、キャラ設定・テーマからその場でAIが台本を生成します。";
+}
 
 /* ---------------- 起動 ---------------- */
 loadChars();
@@ -961,9 +1607,12 @@ renderCharList();
 try {
   const saved = JSON.parse(localStorage.getItem("bb_story") || "null");
   if (saved && Array.isArray(saved.scenes) && saved.scenes.length) {
-    state.story = saved; renderScriptList(); state.phase = "typing";
+    state.story = saved;
+    try { state.overrides = JSON.parse(localStorage.getItem("bb_overrides") || "[]") || []; } catch (e) {}
+    renderScriptList(); renderTimeline(); state.phase = "typing";
   }
 } catch (e) {}
+renderTimeline();
 requestAnimationFrame(frame);
 </script>
 </body>
