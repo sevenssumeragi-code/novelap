@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BB劇場メーカー</title>
+<style>
+  :root {
+    --bg: #14161d; --panel: #1d2029; --panel2: #262a36; --line: #363b4a;
+    --text: #e8eaf2; --sub: #9aa1b5; --accent: #ffcc4d; --accent2: #5ac8e5; --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 20px; margin: 0; color: var(--accent); }
+  header .sub { color: var(--sub); font-size: 12px; }
+  .layout { display: flex; gap: 16px; padding: 16px 20px; align-items: flex-start; }
+  .theater { flex: 1 1 auto; min-width: 0; }
+  canvas#stage { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; display: block; cursor: pointer; }
+  .stagewrap { position: relative; }
+  .recbadge { position: absolute; top: 10px; left: 12px; display: none; align-items: center; gap: 6px;
+    background: rgba(0,0,0,.55); border-radius: 20px; padding: 4px 12px; font-size: 13px; }
+  .recbadge .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #222; border: none; font-weight: 700; }
+  button.rec { background: var(--danger); color: #fff; border: none; font-weight: 700; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sub); }
+  input[type="range"] { width: 90px; }
+  select, input[type="text"], textarea {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px; font-size: 14px; font-family: inherit; }
+  .sidebar { flex: 0 0 380px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 90px); overflow-y: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 15px; color: var(--accent); }
+  .card h2 small { color: var(--sub); font-weight: normal; margin-left: 8px; font-size: 11px; }
+  .charcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+  .charcard .row1 { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .charcard img.thumb { width: 52px; height: 52px; object-fit: contain; background:
+    repeating-conic-gradient(#333 0 25%, #444 0 50%) 0 0 / 16px 16px; border-radius: 6px; flex: 0 0 auto; }
+  .charcard .noimg { width: 52px; height: 52px; border-radius: 6px; background: var(--panel);
+    display: flex; align-items: center; justify-content: center; color: var(--sub); font-size: 22px; flex: 0 0 auto; }
+  .charcard input[type="text"] { flex: 1 1 auto; min-width: 0; }
+  .charcard input[type="color"] { width: 34px; height: 34px; border: none; background: none; padding: 0; cursor: pointer; }
+  .charcard textarea { width: 100%; height: 58px; resize: vertical; font-size: 13px; }
+  .charcard .row2 { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; font-size: 12px; color: var(--sub); }
+  .charcard .del { color: var(--danger); border-color: transparent; background: none; padding: 4px 8px; font-size: 12px; }
+  .filebtn { position: relative; overflow: hidden; font-size: 12px; padding: 5px 10px; }
+  .filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+  .field input[type="text"], .field textarea { width: 100%; }
+  .genrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #genStatus { font-size: 12px; color: var(--sub); margin-top: 8px; white-space: pre-wrap; word-break: break-all;
+    max-height: 90px; overflow-y: auto; }
+  #genStatus.err { color: var(--danger); }
+  #scriptList { font-size: 12px; }
+  #scriptList .sc { padding: 7px 9px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; margin-bottom: 4px; }
+  #scriptList .sc:hover { border-color: var(--accent); }
+  #scriptList .sc.now { background: var(--panel2); border-color: var(--accent); }
+  #scriptList .sc .meta { color: var(--sub); }
+  .hint { font-size: 11px; color: var(--sub); line-height: 1.6; }
+  @media (max-width: 1000px) { .layout { flex-direction: column; } .sidebar { flex: none; width: 100%; max-height: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 BB劇場メーカー</h1>
+  <span class="sub">キャラ設定から物語・演出・BGM選曲まで自動生成して上演する紙芝居劇場</span>
+</header>
+
+<div class="layout">
+  <div class="theater">
+    <div class="stagewrap">
+      <canvas id="stage" width="1280" height="720"></canvas>
+      <div class="recbadge" id="recBadge"><span class="dot"></span>録画中… 最後まで自動上演して保存します</div>
+    </div>
+    <div class="controls">
+      <button id="btnPlay" class="primary">▶ 上演</button>
+      <button id="btnRestart">⏮ 最初から</button>
+      <button id="btnNext">⏭ 次のセリフ</button>
+      <label class="inline"><input type="checkbox" id="chkAuto" checked>オート</label>
+      <label class="inline">文字速度
+        <select id="selSpeed"><option value="20">ゆっくり</option><option value="40" selected>ふつう</option><option value="80">はやい</option></select>
+      </label>
+      <label class="inline">🔊BGM <input type="range" id="rngVol" min="0" max="100" value="45"></label>
+      <span style="flex:1"></span>
+      <button id="btnRecord" class="rec">🎥 動画を録画してダウンロード</button>
+      <button id="btnRecStop" style="display:none">⏹ 録画中止</button>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="card">
+      <h2>👥 登場人物<small>名前・設定・外見(画像)を登録</small></h2>
+      <div id="charList"></div>
+      <button id="btnAddChar">＋ キャラを追加</button>
+      <p class="hint">画像はBB素材(グリーンバック)推奨。「緑背景を透過」でクロマキー合成します。画像がなくてもシルエットで出演します。</p>
+    </div>
+
+    <div class="card">
+      <h2>📖 物語をつくる</h2>
+      <div class="field"><label>テーマ・お題(空欄ならおまかせ)</label>
+        <input type="text" id="inpTheme" placeholder="例: 冷蔵庫のプリンを食べたのは誰だ"></div>
+      <div class="genrow">
+        <label class="inline">シーン数
+          <select id="selScenes"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>8</option></select>
+        </label>
+        <button id="btnGenerate" class="primary">✨ AIで物語を自動作成</button>
+        <button id="btnSample">サンプル劇場</button>
+      </div>
+      <div id="genStatus"></div>
+      <p class="hint">AI生成にはサーバー側に <code>ANTHROPIC_API_KEY</code> が必要です。BGMもAIがシーンごとに選曲します。まずは「サンプル劇場」でお試しできます。</p>
+    </div>
+
+    <div class="card">
+      <h2>📜 台本<small>クリックでそのシーンへ</small></h2>
+      <div id="scriptList"><span class="hint">まだ台本がありません</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+ *  BB劇場メーカー フロントエンド
+ *  - Canvas 1枚に背景/立ち絵/会話ウィンドウを描画(録画しやすくするため)
+ *  - BGM は Web Audio でムード別にリアルタイム演奏(選曲はAI)
+ *  - MediaRecorder で canvas+音声 を WebM として保存
+ * ============================================================ */
+
+const W = 1280, H = 720;
+const DLG = { x: 30, y: H - 225, w: W - 60, h: 200 };   // 会話ウィンドウ
+const STAGE_FLOOR = DLG.y - 12;                          // キャラの足元
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+
+/* ---------------- キャラクター管理 ---------------- */
+const MAX_CHARS = 8;
+let characters = [];   // {id, name, profile, color, chroma, imgData, _img(Canvas|null)}
+
+const DEFAULT_CHARS = [
+  { name: "先輩", color: "#e5b74a", chroma: true,
+    profile: "体格のいい大学生の先輩。一人称「僕」。低音で棒読み気味。余裕ぶっているが大体ツッコミ役。語尾「〜なんだよなあ」「〜(棒読み)」。" },
+  { name: "後輩", color: "#5ac8e5", chroma: true,
+    profile: "調子のいい後輩。一人称「オレ」。ハイテンションなボケ役で、すぐ話を盛って自滅する。「〜っス!」口調。" },
+];
+
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+function hashColor(name) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360} 60% 62%)`;
+}
+
+/* アップロード画像 → 縮小 + (任意)グリーンバック透過済みキャンバス */
+function processImage(dataUrl, chroma, cb) {
+  const img = new Image();
+  img.onload = () => {
+    const scale = Math.min(1, 600 / img.height, 600 / img.width);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.width * scale));
+    c.height = Math.max(1, Math.round(img.height * scale));
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0, c.width, c.height);
+    if (chroma) {
+      const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], gr = d[i + 1], b = d[i + 2];
+        const greenness = gr - Math.max(r, b);
+        if (gr > 70 && greenness > 28) d[i + 3] = 0;                    // 完全に緑
+        else if (gr > 70 && greenness > 12) {                            // 縁: 半透明+色抜き
+          d[i + 3] = Math.round(255 * (1 - (greenness - 12) / 16) * 0.7);
+          d[i + 1] = Math.max(r, b);
+        }
+      }
+      g.putImageData(im, 0, 0);
+    }
+    cb(c);
+  };
+  img.src = dataUrl;
+}
+
+function saveChars() {
+  try {
+    localStorage.setItem("bb_chars", JSON.stringify(characters.map(c => ({
+      id: c.id, name: c.name, profile: c.profile, color: c.color, chroma: c.chroma, imgData: c.imgData || null,
+    }))));
+  } catch (e) { /* 容量超過などは無視(画像が大きい場合) */ }
+}
+
+function loadChars() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("bb_chars") || "null"); } catch (e) {}
+  const list = (saved && saved.length) ? saved : DEFAULT_CHARS.map(c => ({ ...c }));
+  for (const c of list) {
+    const ch = { id: c.id || uid(), name: c.name || "名無し", profile: c.profile || "",
+                 color: c.color || hashColor(c.name || "?"), chroma: c.chroma !== false,
+                 imgData: c.imgData || null, _img: null };
+    if (ch.imgData) processImage(ch.imgData, ch.chroma, cv => { ch._img = cv; renderCharList(); });
+    characters.push(ch);
+  }
+}
+
+function renderCharList() {
+  const box = document.getElementById("charList");
+  box.innerHTML = "";
+  for (const c of characters) {
+    const div = document.createElement("div");
+    div.className = "charcard";
+    div.innerHTML = `
+      <div class="row1">
+        ${c._img ? `<img class="thumb" src="${c._img.toDataURL()}">` : `<div class="noimg">👤</div>`}
+        <input type="text" class="cname" value="" placeholder="名前">
+        <input type="color" class="ccolor" title="ネームプレート/シルエットの色">
+      </div>
+      <textarea class="cprofile" placeholder="設定・口調・一人称など(AIが厳密に守ります)"></textarea>
+      <div class="row2">
+        <button class="filebtn">🖼 外見をアップロード<input type="file" accept="image/*" class="cfile"></button>
+        <label class="inline"><input type="checkbox" class="cchroma">緑背景を透過</label>
+        <span style="flex:1"></span>
+        <button class="del">✕ 削除</button>
+      </div>`;
+    div.querySelector(".cname").value = c.name;
+    div.querySelector(".ccolor").value = toHex(c.color);
+    div.querySelector(".cprofile").value = c.profile;
+    div.querySelector(".cchroma").checked = c.chroma;
+    div.querySelector(".cname").addEventListener("input", e => { c.name = e.target.value; saveChars(); });
+    div.querySelector(".ccolor").addEventListener("input", e => { c.color = e.target.value; saveChars(); });
+    div.querySelector(".cprofile").addEventListener("input", e => { c.profile = e.target.value; saveChars(); });
+    div.querySelector(".cchroma").addEventListener("change", e => {
+      c.chroma = e.target.checked; saveChars();
+      if (c.imgData) processImage(c.imgData, c.chroma, cv => { c._img = cv; renderCharList(); });
+    });
+    div.querySelector(".cfile").addEventListener("change", e => {
+      const f = e.target.files[0]; if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        c.imgData = fr.result;
+        processImage(c.imgData, c.chroma, cv => { c._img = cv; saveChars(); renderCharList(); });
+      };
+      fr.readAsDataURL(f);
+    });
+    div.querySelector(".del").addEventListener("click", () => {
+      characters = characters.filter(x => x !== c); saveChars(); renderCharList();
+    });
+    box.appendChild(div);
+  }
+}
+
+function toHex(color) {
+  if (/^#/.test(color)) return color;
+  const c = document.createElement("canvas").getContext("2d");
+  c.fillStyle = color; return c.fillStyle;
+}
+
+document.getElementById("btnAddChar").addEventListener("click", () => {
+  if (characters.length >= MAX_CHARS) return alert(`キャラは最大${MAX_CHARS}人までです`);
+  characters.push({ id: uid(), name: `キャラ${characters.length + 1}`, profile: "", color: hashColor(uid()),
+                    chroma: true, imgData: null, _img: null });
+  saveChars(); renderCharList();
+});
+
+function findChar(name) {
+  return characters.find(c => c.name.trim() === String(name).trim()) || null;
+}
+const ephemeral = {};   // 台本に出てくる未登録キャラ用
+function getActor(name) {
+  const c = findChar(name);
+  if (c) return c;
+  if (!ephemeral[name]) ephemeral[name] = { name, color: hashColor(name), _img: null };
+  return ephemeral[name];
+}
+
+/* ---------------- 背景描画(時刻対応の手描き背景) ---------------- */
+const SKY = {
+  day:     ["#7ec8f7", "#d9f0ff"], evening: ["#f2814d", "#ffd9a0"], night: ["#0b1436", "#25406e"],
+};
+function skyGrad(time, h) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  const [a, b] = SKY[time] || SKY.day;
+  g.addColorStop(0, a); g.addColorStop(1, b); return g;
+}
+function drawSunMoon(time) {
+  ctx.save();
+  if (time === "night") {
+    ctx.fillStyle = "#f5f0d8"; ctx.beginPath(); ctx.arc(1100, 110, 44, 0, 7); ctx.fill();
+    ctx.fillStyle = SKY.night[0]; ctx.beginPath(); ctx.arc(1082, 100, 40, 0, 7); ctx.fill();
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < 24; i++) { const x = (i * 379) % W, y = (i * 173) % 260; ctx.fillRect(x, y, 2, 2); }
+  } else {
+    ctx.fillStyle = time === "evening" ? "#ff9a3d" : "#ffe08a";
+    ctx.beginPath(); ctx.arc(1090, 120, 52, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+function buildings(baseY, dark) {
+  const cols = dark ? ["#1c2440", "#232c4e", "#2a355c"] : ["#8fa3b8", "#a5b6c8", "#7d92a8"];
+  let x = -20, i = 0;
+  while (x < W + 40) {
+    const w = 90 + (i * 53) % 110, h = 130 + (i * 97) % 220;
+    ctx.fillStyle = cols[i % 3]; ctx.fillRect(x, baseY - h, w, h);
+    for (let wy = baseY - h + 16; wy < baseY - 18; wy += 34)
+      for (let wx = x + 10; wx < x + w - 16; wx += 26) {
+        ctx.fillStyle = dark ? ((wx * wy) % 5 < 2 ? "#ffd76b" : "#101830") : "#e8f4ff";
+        ctx.fillRect(wx, wy, 14, 18);
+      }
+    x += w + 14; i++;
+  }
+}
+const BG_DRAW = {
+  room(time) {
+    ctx.fillStyle = time === "night" ? "#4a4038" : "#8a7a63"; ctx.fillRect(0, 0, W, H);       // 壁
+    ctx.fillStyle = time === "night" ? "#6b5335" : "#b08d55"; ctx.fillRect(0, 470, W, H - 470); // 床
+    ctx.fillStyle = "#5c4a33"; ctx.fillRect(0, 462, W, 12);
+    ctx.fillStyle = "#3d3226"; ctx.fillRect(120, 90, 300, 260);                                 // 窓枠
+    ctx.fillStyle = skyGrad(time, 340); ctx.fillRect(132, 102, 276, 236);
+    ctx.fillStyle = "#3d3226"; ctx.fillRect(255, 102, 10, 236); ctx.fillRect(132, 212, 276, 8);
+    ctx.fillStyle = "#4c3b2a"; ctx.fillRect(870, 330, 300, 140);                                // 棚
+    ctx.fillStyle = "#2c2c34"; ctx.fillRect(905, 230, 230, 100);                                // テレビ
+    ctx.fillStyle = time === "night" ? "#9fd8ff" : "#1a2a3a"; ctx.fillRect(915, 240, 210, 80);
+    ctx.fillStyle = "#c9a86a"; ctx.beginPath(); ctx.ellipse(640, 560, 240, 60, 0, 0, 7); ctx.fill(); // ちゃぶ台
+    ctx.fillStyle = "#a8874d"; ctx.beginPath(); ctx.ellipse(640, 548, 240, 60, 0, 0, 7); ctx.fill();
+  },
+  park(time) {
+    ctx.fillStyle = skyGrad(time, 460); ctx.fillRect(0, 0, W, 460); drawSunMoon(time);
+    ctx.fillStyle = time === "night" ? "#1d3b24" : "#69b25a"; ctx.fillRect(0, 430, W, H - 430);
+    for (const [tx, s] of [[180, 1], [420, .8], [1080, 1.1], [860, .7]]) {
+      ctx.fillStyle = "#6d4c2f"; ctx.fillRect(tx - 12 * s, 320, 24 * s, 130 * s);
+      ctx.fillStyle = time === "night" ? "#173321" : "#3e8c3e";
+      ctx.beginPath(); ctx.arc(tx, 300 - 20 * s, 85 * s, 0, 7); ctx.arc(tx - 60 * s, 340, 55 * s, 0, 7); ctx.arc(tx + 60 * s, 340, 55 * s, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = "#8a6a45"; ctx.fillRect(560, 470, 220, 16); ctx.fillRect(575, 486, 14, 40); ctx.fillRect(750, 486, 14, 40); // ベンチ
+    ctx.fillStyle = time === "night" ? "#2c2c2c" : "#d9cbb2"; ctx.beginPath(); ctx.ellipse(640, 620, 520, 90, 0, 0, 7); ctx.fill(); // 広場
+  },
+  street(time) {
+    ctx.fillStyle = skyGrad(time, 420); ctx.fillRect(0, 0, W, 420); drawSunMoon(time);
+    buildings(430, time === "night");
+    ctx.fillStyle = time === "night" ? "#2a2a30" : "#8f8f96"; ctx.fillRect(0, 430, W, H - 430); // 道路
+    ctx.fillStyle = time === "night" ? "#3a3a42" : "#b9b9c0"; ctx.fillRect(0, 430, W, 60);      // 歩道
+    ctx.strokeStyle = "#f5f5f5"; ctx.lineWidth = 6; ctx.setLineDash([40, 30]);
+    ctx.beginPath(); ctx.moveTo(0, 600); ctx.lineTo(W, 600); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "#5c5c66"; ctx.fillRect(1150, 120, 14, 370);                                 // 電柱
+    ctx.fillRect(1090, 150, 130, 8);
+  },
+  school(time) {
+    ctx.fillStyle = "#e8e0c8"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#c8bda0"; ctx.fillRect(0, 440, W, 12);
+    ctx.fillStyle = time === "night" ? "#7d6f52" : "#c9b98e"; ctx.fillRect(0, 452, W, H - 452); // 床
+    ctx.fillStyle = "#2e5c3f"; ctx.fillRect(390, 90, 520, 250);                                  // 黒板
+    ctx.strokeStyle = "#c9a86a"; ctx.lineWidth = 12; ctx.strokeRect(384, 84, 532, 262);
+    ctx.fillStyle = "#e8e8e8"; ctx.font = "36px sans-serif"; ctx.fillText("BB劇場", 420, 150);
+    for (const wx of [60, 1040]) {                                                                // 窓
+      ctx.fillStyle = "#9a8f74"; ctx.fillRect(wx, 100, 200, 240);
+      ctx.fillStyle = skyGrad(time, 340); ctx.fillRect(wx + 10, 110, 180, 220);
+      ctx.fillStyle = "#9a8f74"; ctx.fillRect(wx + 95, 110, 10, 220);
+    }
+    ctx.fillStyle = "#b08d55"; ctx.fillRect(200, 500, 220, 26); ctx.fillRect(860, 500, 220, 26); // 机
+    ctx.fillStyle = "#8a6a3f"; ctx.fillRect(210, 526, 16, 70); ctx.fillRect(394, 526, 16, 70);
+    ctx.fillRect(870, 526, 16, 70); ctx.fillRect(1054, 526, 16, 70);
+  },
+  office(time) {
+    ctx.fillStyle = time === "night" ? "#39404e" : "#dfe4ea"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = time === "night" ? "#2c313c" : "#c3cad4"; ctx.fillRect(0, 460, W, H - 460);
+    ctx.fillStyle = "#556070"; ctx.fillRect(80, 80, 1120, 12);
+    for (const wx of [100, 480, 860]) {                                                          // 大窓
+      ctx.fillStyle = "#556070"; ctx.fillRect(wx, 92, 320, 250);
+      ctx.fillStyle = skyGrad(time, 350); ctx.fillRect(wx + 8, 100, 304, 234);
+      ctx.save(); ctx.beginPath(); ctx.rect(wx + 8, 100, 304, 234); ctx.clip();
+      ctx.translate(wx - 400, -120); buildings(430, time === "night"); ctx.restore();
+    }
+    ctx.fillStyle = "#8f9aa8"; ctx.fillRect(150, 480, 400, 22); ctx.fillRect(730, 480, 400, 22); // デスク
+    ctx.fillStyle = "#222831"; ctx.fillRect(240, 380, 130, 100); ctx.fillRect(820, 380, 130, 100); // モニタ
+    ctx.fillStyle = "#7ec8f7"; ctx.fillRect(248, 388, 114, 76); ctx.fillRect(828, 388, 114, 76);
+  },
+  conbini(time) {
+    ctx.fillStyle = skyGrad(time, 510); ctx.fillRect(0, 0, W, 510); drawSunMoon(time);
+    ctx.fillStyle = "#f2f2ee"; ctx.fillRect(90, 170, 1100, 330);                                 // 店舗
+    ctx.fillStyle = "#fff"; ctx.fillRect(90, 170, 1100, 60);
+    ctx.fillStyle = "#e84545"; ctx.fillRect(90, 178, 1100, 14);
+    ctx.fillStyle = "#2e7dd1"; ctx.fillRect(90, 208, 1100, 14);
+    ctx.fillStyle = "#333"; ctx.font = "bold 40px sans-serif"; ctx.fillText("BBマート 24h", 500, 218);
+    ctx.fillStyle = time === "night" ? "#fff8d0" : "#dff2ff";                                    // 光る窓
+    ctx.fillRect(130, 250, 300, 240); ctx.fillRect(470, 250, 300, 240); ctx.fillRect(880, 250, 270, 240);
+    ctx.fillStyle = "#b9c4cc";
+    ctx.fillRect(455, 250, 15, 240); ctx.fillRect(770, 250, 15, 240);
+    ctx.fillStyle = time === "night" ? "#30343c" : "#9aa4ae"; ctx.fillRect(0, 500, W, H - 500);   // 駐車場
+    ctx.strokeStyle = "#eee"; ctx.lineWidth = 5;
+    for (const lx of [200, 500, 800, 1100]) { ctx.beginPath(); ctx.moveTo(lx, 520); ctx.lineTo(lx - 60, 700); ctx.stroke(); }
+  },
+  beach(time) {
+    ctx.fillStyle = skyGrad(time, 400); ctx.fillRect(0, 0, W, 400); drawSunMoon(time);
+    ctx.fillStyle = time === "night" ? "#12365c" : "#2e8fd1"; ctx.fillRect(0, 360, W, 160);      // 海
+    ctx.fillStyle = time === "night" ? "#1c4a78" : "#5ab4e8";
+    for (let x = 0; x < W; x += 90) { ctx.beginPath(); ctx.arc(x + 45, 520, 45, Math.PI, 0); ctx.fill(); }
+    ctx.fillStyle = time === "night" ? "#8a7a55" : "#e8d9a0"; ctx.fillRect(0, 520, W, H - 520);  // 砂浜
+    ctx.fillStyle = "#fff"; ctx.globalAlpha = .7;
+    for (let x = 20; x < W; x += 160) ctx.fillRect(x, 356, 70, 5);
+    ctx.globalAlpha = 1;
+  },
+  night_city(time) {
+    ctx.fillStyle = skyGrad("night", 420); ctx.fillRect(0, 0, W, 420); drawSunMoon("night");
+    buildings(440, true);
+    ctx.fillStyle = "#17171d"; ctx.fillRect(0, 440, W, H - 440);
+    const neon = [["#ff4d88", 150, 200], ["#4dd2ff", 420, 150], ["#ffe14d", 760, 230], ["#7dff6b", 1010, 170]];
+    for (const [c, x, y] of neon) {
+      ctx.fillStyle = c; ctx.globalAlpha = .9; ctx.fillRect(x, y, 120, 46);
+      ctx.globalAlpha = .25; ctx.fillRect(x - 8, y - 8, 136, 62); ctx.globalAlpha = 1;
+      ctx.fillStyle = "#111"; ctx.font = "bold 26px sans-serif"; ctx.fillText("〼〼", x + 30, y + 33);
+    }
+    ctx.fillStyle = "#f5d76b"; ctx.globalAlpha = .15;
+    ctx.beginPath(); ctx.ellipse(640, 700, 620, 120, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  },
+};
+
+/* ---------------- キャラ立ち絵の描画 ---------------- */
+function drawActor(a, x, speaking, emotion, t) {
+  const bob = speaking ? Math.abs(Math.sin(t * 9)) * 16 : 0;               // BB風バウンド
+  const shake = (speaking && emotion === "angry") ? Math.sin(t * 60) * 5 : 0;
+  const jump = (speaking && emotion === "shock") ? Math.max(0, Math.sin(t * 6)) * 26 : 0;
+  const hBase = 360 * (speaking ? 1.06 : 1);
+  const y0 = STAGE_FLOOR - bob - jump;
+  ctx.save();
+  if (!speaking) ctx.filter = "brightness(0.62)";
+  if (a._img) {
+    const ratio = a._img.width / a._img.height;
+    const h = hBase, w = h * ratio;
+    ctx.drawImage(a._img, x - w / 2 + shake, y0 - h, w, h);
+  } else {  // プレースホルダー(シルエット人形)
+    const h = hBase * 0.92, headR = h * 0.19;
+    ctx.fillStyle = a.color;
+    ctx.beginPath(); ctx.arc(x + shake, y0 - h + headR, headR, 0, 7); ctx.fill();       // 頭
+    ctx.beginPath();                                                                     // 体
+    ctx.moveTo(x - h * 0.22 + shake, y0);
+    ctx.quadraticCurveTo(x + shake, y0 - h * 0.95, x + h * 0.22 + shake, y0);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#1b1d24";                                                           // 顔
+    const fy = y0 - h + headR, fx = x + shake;
+    if (emotion === "happy" || emotion === "smug") {
+      ctx.beginPath(); ctx.arc(fx - headR * .38, fy - 4, 7, Math.PI, 0); ctx.arc(fx + headR * .38, fy - 4, 7, Math.PI, 0);
+      ctx.lineWidth = 4; ctx.strokeStyle = "#1b1d24"; ctx.stroke();
+      ctx.beginPath(); ctx.arc(fx, fy + headR * .35, 10, 0, Math.PI); ctx.stroke();
+    } else if (emotion === "sad") {
+      ctx.fillRect(fx - headR * .45, fy - 5, 12, 5); ctx.fillRect(fx + headR * .45 - 12, fy - 5, 12, 5);
+      ctx.beginPath(); ctx.arc(fx, fy + headR * .5, 9, Math.PI, 0); ctx.lineWidth = 4; ctx.strokeStyle = "#1b1d24"; ctx.stroke();
+    } else if (emotion === "angry") {
+      ctx.save(); ctx.strokeStyle = "#1b1d24"; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(fx - headR * .55, fy - 12); ctx.lineTo(fx - headR * .15, fy - 2);
+      ctx.moveTo(fx + headR * .55, fy - 12); ctx.lineTo(fx + headR * .15, fy - 2); ctx.stroke(); ctx.restore();
+      ctx.fillRect(fx - 10, fy + headR * .35, 20, 6);
+    } else {
+      ctx.beginPath(); ctx.arc(fx - headR * .38, fy - 2, 5, 0, 7); ctx.arc(fx + headR * .38, fy - 2, 5, 0, 7); ctx.fill();
+      ctx.fillRect(fx - 9, fy + headR * .4, 18, 5);
+    }
+  }
+  ctx.restore();
+  if (speaking && emotion !== "normal") {                                   // 感情マーク
+    const mark = { happy: "♪", angry: "💢", sad: "💧", shock: "❗", smug: "😏" }[emotion];
+    if (mark) {
+      ctx.font = "52px sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = "#fff";
+      ctx.fillText(mark, x + hBase * 0.32, STAGE_FLOOR - hBase - 8 + Math.sin(t * 5) * 6);
+      ctx.textAlign = "left";
+    }
+  }
+}
+
+/* ---------------- BGMエンジン(Web Audio) ---------------- */
+const nfreq = m => 440 * Math.pow(2, (m - 69) / 12);
+const MOODS = {
+  comical:   { bpm: 138, bass: "square",  lead: "square",   drums: true,  leadG: .05,
+               prog: [[72,76,79],[77,81,84],[79,83,86],[77,81,84]], arp: [0,2,1,2,0,2,1,0] },
+  daily:     { bpm: 102, bass: "triangle", lead: "triangle", drums: true,  leadG: .06,
+               prog: [[72,76,79],[69,72,76],[74,77,81],[71,74,79]], arp: [0,1,2,1,-1,1,2,1] },
+  tense:     { bpm: 152, bass: "sawtooth", lead: "sawtooth", drums: true,  leadG: .035,
+               prog: [[69,72,76],[69,72,76],[68,71,75],[70,73,77]], arp: [0,0,1,0,2,0,1,0] },
+  sad:       { bpm: 76,  bass: "triangle", lead: "triangle", drums: false, leadG: .07,
+               prog: [[69,72,76],[65,69,72],[72,76,79],[67,71,74]], arp: [0,-1,1,-1,2,-1,1,-1] },
+  epic:      { bpm: 142, bass: "sawtooth", lead: "sawtooth", drums: true,  leadG: .05,
+               prog: [[69,76,81],[65,72,77],[67,74,79],[70,77,82]], arp: [0,1,2,1,0,1,2,1] },
+  heartwarm: { bpm: 92,  bass: "sine",     lead: "sine",     drums: false, leadG: .08,
+               prog: [[72,76,79],[67,71,74],[69,72,76],[65,69,72]], arp: [0,1,2,-1,1,2,0,-1] },
+  horror:    { bpm: 60,  bass: "sine",     lead: "sine",     drums: false, leadG: .05, drone: [33, 39],
+               prog: [[69,75],[68,74],[69,75],[70,76]], arp: [-1,-1,0,-1,-1,1,-1,-1] },
+};
+
+const bgm = {
+  ctx: null, master: null, seGain: null, recDest: null,
+  mood: null, step: 0, nextT: 0, timer: null, droneNodes: [],
+  ensure() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = document.getElementById("rngVol").value / 100;
+      this.seGain = this.ctx.createGain(); this.seGain.gain.value = 0.5;
+      this.master.connect(comp); this.seGain.connect(comp);
+      comp.connect(this.ctx.destination);
+      this.recDest = this.ctx.createMediaStreamDestination();
+      comp.connect(this.recDest);
+    }
+    if (this.ctx.state === "suspended") this.ctx.resume();
+  },
+  setMood(m) {
+    this.ensure();
+    if (m === this.mood) return;
+    this.stopDrone(); this.mood = m; this.step = 0;
+    this.nextT = this.ctx.currentTime + 0.06;
+    if (!this.timer) this.timer = setInterval(() => this.tick(), 25);
+    const def = MOODS[m];
+    if (def && def.drone) for (const dm of def.drone) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = "sawtooth"; o.frequency.value = nfreq(dm); g.gain.value = 0.045;
+      o.connect(g); g.connect(this.master); o.start(); this.droneNodes.push(o, g);
+    }
+  },
+  stop() { this.mood = null; this.stopDrone(); },
+  stopDrone() {
+    for (const n of this.droneNodes) { try { n.stop ? n.stop() : n.disconnect(); } catch (e) {} }
+    this.droneNodes = [];
+  },
+  tick() {
+    if (!this.mood || !this.ctx) return;
+    const def = MOODS[this.mood]; if (!def) return;
+    const spb = 60 / def.bpm / 2;   // 8分音符
+    while (this.nextT < this.ctx.currentTime + 0.18) {
+      this.schedule(def, this.step, this.nextT, spb);
+      this.step = (this.step + 1) % (def.prog.length * 8);
+      this.nextT += spb;
+    }
+  },
+  schedule(def, step, t, spb) {
+    const chord = def.prog[Math.floor(step / 8) % def.prog.length];
+    const s = step % 8;
+    if (s % 2 === 0) this.note(nfreq(chord[0] - 24), t, spb * 1.6, def.bass, 0.09);           // ベース
+    if (s === 0) for (const m of chord) this.note(nfreq(m - 12), t, spb * 7.5, "triangle", 0.028); // パッド
+    const ai = def.arp[s];
+    if (ai >= 0) this.note(nfreq(chord[ai % chord.length]), t, spb * 0.9, def.lead, def.leadG);   // メロディ
+    if (def.drums) {
+      if (s === 0 || s === 4) this.kick(t);
+      if (s % 2 === 1) this.hat(t);
+    }
+    if (def.drone && Math.random() < 0.12) this.note(nfreq(93 + Math.floor(Math.random() * 8)), t, 1.2, "sine", 0.03);
+  },
+  note(freq, t, dur, wave, gain, dest) {
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = wave; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(dest || this.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  },
+  kick(t) {
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.12);
+    g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.2);
+  },
+  hat(t) {
+    const len = 0.04, buf = this.ctx.createBuffer(1, this.ctx.sampleRate * len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const f = this.ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 6500;
+    const g = this.ctx.createGain(); g.gain.value = 0.05;
+    src.connect(f); f.connect(g); g.connect(this.master); src.start(t);
+  },
+  blip(base) {        // セリフ送りの「ピロピロ」
+    if (!this.ctx) return;
+    this.note(base, this.ctx.currentTime, 0.045, "square", 0.03, this.seGain);
+  },
+  pop() {             // セリフ開始のポップ音
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(300, t); o.frequency.exponentialRampToValueAtTime(700, t + 0.07);
+    g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(g); g.connect(this.seGain); o.start(t); o.stop(t + 0.12);
+  },
+};
+document.getElementById("rngVol").addEventListener("input", e => {
+  if (bgm.master) bgm.master.gain.value = e.target.value / 100;
+});
+function blipFreq(name) {
+  let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return 350 + (h % 450);
+}
+
+/* ---------------- 再生ステートマシン ---------------- */
+const state = {
+  story: null, sc: 0, ln: 0, shown: 0,
+  playing: false, phase: "idle",   // idle | typing | holding | transition | end
+  holdT: 0, fade: 0, fadeDir: 0, pendingScene: 0,
+  auto: true, recording: false, t: 0, lastTs: 0, endT: 0,
+};
+
+function curScene() { return state.story ? state.story.scenes[state.sc] : null; }
+function curLine() { const s = curScene(); return s ? s.lines[state.ln] : null; }
+
+function startScene(idx, withFade) {
+  state.pendingScene = idx;
+  if (withFade && state.phase !== "idle") { state.phase = "transition"; state.fadeDir = 1; }
+  else applyScene(idx);
+}
+function applyScene(idx) {
+  state.sc = idx; state.ln = 0; state.shown = 0;
+  const s = curScene();
+  if (s) bgm.setMood(s.bgm);
+  renderScriptList();
+  if (state.fadeDir > 0) {
+    state.fadeDir = -1;              // phase は transition のまま、フェードインへ
+  } else {
+    state.phase = "typing";
+    bgm.pop();
+  }
+}
+function nextLine() {
+  const s = curScene(); if (!s) return;
+  if (state.ln + 1 < s.lines.length) {
+    state.ln++; state.shown = 0; state.phase = "typing"; bgm.pop();
+  } else if (state.sc + 1 < state.story.scenes.length) {
+    startScene(state.sc + 1, true);
+  } else {
+    state.phase = "end"; state.endT = 0;
+    setTimeout(() => bgm.stop(), 1800);
+    if (state.recording) setTimeout(stopRecording, 2400);
+  }
+}
+function advance() {   // クリック/次へボタン
+  if (!state.story || state.phase === "transition" || state.phase === "end") return;
+  const line = curLine(); if (!line) return;
+  if (state.phase === "typing" && state.shown < line.text.length) { state.shown = line.text.length; state.phase = "holding"; state.holdT = 0; }
+  else nextLine();
+}
+
+/* ---------------- 描画ループ ---------------- */
+function frame(ts) {
+  const dt = Math.min(0.1, (ts - state.lastTs) / 1000 || 0.016);
+  state.lastTs = ts; state.t += dt;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+function update(dt) {
+  if (!state.story) return;
+  const cps = +document.getElementById("selSpeed").value;
+  if (state.phase === "typing" && state.playing) {
+    const line = curLine();
+    const prev = Math.floor(state.shown);
+    state.shown = Math.min(line.text.length, state.shown + cps * dt);
+    if (Math.floor(state.shown) > prev && Math.floor(state.shown) % 3 === 0 && line.speaker !== "ナレーション")
+      bgm.blip(blipFreq(line.speaker));
+    if (state.shown >= line.text.length) { state.phase = "holding"; state.holdT = 0; }
+  } else if (state.phase === "holding" && state.playing && state.auto) {
+    state.holdT += dt;
+    const line = curLine();
+    if (state.holdT > 0.9 + line.text.length * 0.028) nextLine();
+  } else if (state.phase === "transition") {
+    state.fade += dt * 2.4 * state.fadeDir;
+    if (state.fadeDir > 0 && state.fade >= 1) { state.fade = 1; applyScene(state.pendingScene); }
+    else if (state.fadeDir < 0 && state.fade <= 0) {
+      state.fade = 0; state.fadeDir = 0; state.phase = "typing"; bgm.pop();
+    }
+  } else if (state.phase === "end") {
+    state.endT += dt;
+  }
+}
+
+function wrapText(text, maxW) {
+  const lines = []; let cur = "";
+  for (const ch of text) {
+    if (ch === "\n") { lines.push(cur); cur = ""; continue; }
+    if (ctx.measureText(cur + ch).width > maxW) { lines.push(cur); cur = ch; }
+    else cur += ch;
+  }
+  lines.push(cur);
+  return lines;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (!state.story) { drawTitleScreen(); return; }
+  const scene = curScene();
+  (BG_DRAW[scene.background] || BG_DRAW.park)(scene.time);
+
+  // 出演キャラ(このシーンの話者全員)
+  const names = [...new Set(scene.lines.map(l => l.speaker).filter(s => s && s !== "ナレーション"))];
+  const line = curLine();
+  names.forEach((n, i) => {
+    const x = W * (i + 1) / (names.length + 1);
+    const speaking = line && line.speaker === n && state.phase !== "transition";
+    drawActor(getActor(n), x, speaking, speaking ? line.emotion : "normal", state.t);
+  });
+
+  drawDialog(line);
+
+  if (state.phase === "transition" || state.fade > 0) {                  // 場面転換フェード
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(1, state.fade)})`; ctx.fillRect(0, 0, W, H);
+  }
+  if (state.phase === "end") drawEndScreen();
+}
+
+function drawDialog(line) {
+  if (!line || state.phase === "end") return;
+  const { x, y, w, h } = DLG;
+  ctx.fillStyle = "rgba(12,14,24,0.82)";
+  roundRect(x, y, w, h, 14); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3;
+  roundRect(x + 4, y + 4, w - 8, h - 8, 11); ctx.stroke();
+
+  const isNarr = line.speaker === "ナレーション";
+  if (!isNarr) {                                                          // ネームプレート
+    const a = getActor(line.speaker);
+    ctx.font = "bold 26px sans-serif";
+    const nw = ctx.measureText(line.speaker).width + 36;
+    ctx.fillStyle = a.color || "#888";
+    roundRect(x + 24, y - 22, nw, 44, 9); ctx.fill();
+    ctx.fillStyle = "#15171f";
+    ctx.fillText(line.speaker, x + 42, y + 9);
+  } else {
+    ctx.font = "bold 22px sans-serif"; ctx.fillStyle = "#9aa1b5";
+    ctx.fillText("― ナレーション ―", x + 30, y + 34);
+  }
+
+  ctx.font = isNarr ? "26px sans-serif" : "30px sans-serif";
+  ctx.fillStyle = isNarr ? "#c9cfdd" : "#f4f5fa";
+  const shown = line.text.slice(0, Math.floor(state.shown));
+  const tx = x + 34, ty = y + (isNarr ? 72 : 62), lh = isNarr ? 36 : 42;
+  wrapText(shown, w - 70).slice(0, 4).forEach((l, i) => ctx.fillText(l, tx, ty + i * lh));
+
+  if (state.phase === "holding") {                                        // ▼ 送りマーク
+    ctx.fillStyle = "#ffcc4d"; ctx.font = "26px sans-serif";
+    ctx.fillText("▼", x + w - 52, y + h - 22 + Math.sin(state.t * 6) * 4);
+  }
+}
+
+function drawTitleScreen() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#1a1e2e"); g.addColorStop(1, "#0d0f18");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffcc4d"; ctx.font = "bold 64px sans-serif";
+  ctx.fillText("🎬 BB劇場メーカー", W / 2, 260);
+  ctx.fillStyle = "#9aa1b5"; ctx.font = "26px sans-serif";
+  ctx.fillText("右のパネルでキャラを登録して「AIで物語を自動作成」を押してください", W / 2, 340);
+  ctx.fillText("(まずは「サンプル劇場」でお試しできます)", W / 2, 390);
+  ctx.textAlign = "left";
+}
+
+function drawEndScreen() {
+  const a = Math.min(1, state.endT * 1.2);
+  ctx.fillStyle = `rgba(0,0,0,${a * 0.85})`; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = a; ctx.textAlign = "center";
+  ctx.fillStyle = "#ffcc4d"; ctx.font = "bold 72px serif";
+  ctx.fillText("完", W / 2, H / 2 - 10);
+  ctx.fillStyle = "#c9cfdd"; ctx.font = "26px sans-serif";
+  ctx.fillText(state.story.title || "", W / 2, H / 2 + 60);
+  ctx.textAlign = "left"; ctx.globalAlpha = 1;
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ---------------- 台本リスト ---------------- */
+function renderScriptList() {
+  const box = document.getElementById("scriptList");
+  if (!state.story) { box.innerHTML = '<span class="hint">まだ台本がありません</span>'; return; }
+  box.innerHTML = "";
+  const bgNames = { room: "部屋", park: "公園", street: "路上", school: "教室", office: "オフィス",
+                    conbini: "コンビニ", beach: "海辺", night_city: "夜の街" };
+  state.story.scenes.forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "sc" + (i === state.sc ? " now" : "");
+    const first = s.lines[0] ? `${s.lines[0].speaker}「${s.lines[0].text.slice(0, 22)}…」` : "";
+    div.innerHTML = `<b>シーン${i + 1}</b> <span class="meta">📍${bgNames[s.background] || s.background} / 🎵${s.bgm}</span><br>${escapeHtml(first)}`;
+    div.addEventListener("click", () => { userGesture(); startScene(i, true); state.playing = true; updatePlayBtn(); });
+    box.appendChild(div);
+  });
+}
+function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+/* ---------------- 物語生成 ---------------- */
+const genStatus = document.getElementById("genStatus");
+
+async function generateStory() {
+  const chars = characters.filter(c => c.name.trim());
+  if (!chars.length) return alert("キャラクターを1人以上登録してください");
+  const btn = document.getElementById("btnGenerate");
+  btn.disabled = true;
+  genStatus.className = ""; genStatus.textContent = "🤖 AIが台本を執筆中…(1〜2分かかることがあります)";
+  try {
+    const res = await fetch("/api/story", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        theme: document.getElementById("inpTheme").value,
+        scene_count: +document.getElementById("selScenes").value,
+        characters: chars.map(c => ({ name: c.name.trim(), profile: c.profile })),
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let text = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += dec.decode(value, { stream: true });
+      genStatus.textContent = `🤖 執筆中… ${text.length}文字`;
+    }
+    if (text.includes("[エラー]")) throw new Error(text.slice(text.indexOf("[エラー]")).trim());
+    const story = JSON.parse(text);
+    if (!story.scenes || !story.scenes.length) throw new Error("台本が空でした。もう一度お試しください。");
+    loadStory(story);
+    genStatus.textContent = `✅ 「${story.title}」完成!(全${story.scenes.length}シーン)上演を開始します`;
+  } catch (e) {
+    genStatus.className = "err";
+    genStatus.textContent = "⚠ 生成に失敗しました: " + e.message +
+      "\nサーバー側の ANTHROPIC_API_KEY 設定を確認するか、「サンプル劇場」をお試しください。";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function loadStory(story) {
+  state.story = story;
+  try { localStorage.setItem("bb_story", JSON.stringify(story)); } catch (e) {}
+  userGesture();
+  state.playing = true;
+  state.phase = "idle";
+  startScene(0, false);
+  updatePlayBtn();
+}
+
+/* API キーなしでも試せるサンプル台本 */
+function sampleStory() {
+  const A = (characters[0] && characters[0].name.trim()) || "先輩";
+  const B = (characters[1] && characters[1].name.trim()) || "後輩";
+  return {
+    title: `${A}と${B}の限界アイス戦争`,
+    scenes: [
+      { background: "room", time: "day", bgm: "daily", lines: [
+        { speaker: "ナレーション", text: "8月。うだるような暑さのアパートの一室。", emotion: "normal" },
+        { speaker: A, text: `あー、暑い。こういう時は冷凍庫のアイスに限るんだよなあ。`, emotion: "happy" },
+        { speaker: A, text: `…ん? ないんだけど。僕のアイス、ないんだけど(半ギレ)`, emotion: "angry" },
+        { speaker: B, text: `うわ、${A}さんチーッス! 今日も元気っスね!`, emotion: "happy" },
+        { speaker: A, text: `口の周りにチョコついてるゾ。`, emotion: "smug" },
+        { speaker: B, text: `!?`, emotion: "shock" },
+      ]},
+      { background: "conbini", time: "evening", bgm: "comical", lines: [
+        { speaker: "ナレーション", text: "弁明の機会も与えられず、後輩は買い直しを命じられた。", emotion: "normal" },
+        { speaker: B, text: `同じアイス買えばセーフっしょ! オレ天才っス!`, emotion: "happy" },
+        { speaker: B, text: `…え、財布がない。ウソだろ、家に置いてきた?`, emotion: "shock" },
+        { speaker: A, text: `(ガラス越しにこっちを見ている)`, emotion: "smug" },
+        { speaker: B, text: `み、見られてる…! 気まずさで店内3周目に突入っス…!`, emotion: "sad" },
+      ]},
+      { background: "night_city", time: "night", bgm: "tense", lines: [
+        { speaker: "ナレーション", text: "閉店間際。最後の1個をめぐり、謎の争奪戦が始まった。", emotion: "normal" },
+        { speaker: A, text: `おっ、そのアイス、ラス1じゃん。悪いけど僕が買うから。`, emotion: "smug" },
+        { speaker: B, text: `いや、それを買って返すのがオレの誠意なんスよ! 渡さないっス!`, emotion: "angry" },
+        { speaker: A, text: `お前、財布は?`, emotion: "normal" },
+        { speaker: B, text: `……${A}さん、立て替えお願いするっス。`, emotion: "sad" },
+        { speaker: A, text: `誠意とは一体…うごごご!`, emotion: "shock" },
+      ]},
+      { background: "park", time: "night", bgm: "heartwarm", lines: [
+        { speaker: "ナレーション", text: "結局アイスは2人で半分こ。夏の夜風がやさしい。", emotion: "normal" },
+        { speaker: B, text: `${A}さん、なんかスンマセンした。今度バイト代で倍返しするっス。`, emotion: "sad" },
+        { speaker: A, text: `いいよ、来いよ。来月も再来月も、ウチの冷凍庫にアイス補充しに。`, emotion: "happy" },
+        { speaker: B, text: `それ実質無限アイス係じゃないっスか!?`, emotion: "shock" },
+        { speaker: "ナレーション", text: "こうして後輩は永久アイス係に任命された。完。", emotion: "normal" },
+      ]},
+    ],
+  };
+}
+
+/* ---------------- 録画(動画ダウンロード) ---------------- */
+let recorder = null, recChunks = [];
+
+function startRecording() {
+  if (!state.story) return alert("先に物語を作成(またはサンプル劇場を読み込み)してください");
+  if (state.recording) return;
+  userGesture();
+  const vs = canvas.captureStream(30);
+  const stream = new MediaStream([...vs.getVideoTracks(), ...bgm.recDest.stream.getAudioTracks()]);
+  const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+    .find(m => MediaRecorder.isTypeSupported(m)) || "";
+  recChunks = [];
+  recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(recChunks, { type: "video/webm" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(state.story.title || "bb_theater").replace(/[\\/:*?"<>|]/g, "_")}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    genStatus.className = "";
+    genStatus.textContent = `🎥 動画(${(blob.size / 1048576).toFixed(1)}MB / WebM)をダウンロードしました`;
+  };
+  recorder.start(250);
+  state.recording = true;
+  document.getElementById("recBadge").style.display = "flex";
+  document.getElementById("btnRecord").style.display = "none";
+  document.getElementById("btnRecStop").style.display = "";
+  // 最初から自動上演して、終劇後に自動で保存される
+  state.auto = true; document.getElementById("chkAuto").checked = true;
+  state.playing = true; state.phase = "idle";
+  startScene(0, false);
+  updatePlayBtn();
+}
+
+function stopRecording() {
+  if (!state.recording) return;
+  state.recording = false;
+  if (recorder && recorder.state !== "inactive") recorder.stop();
+  document.getElementById("recBadge").style.display = "none";
+  document.getElementById("btnRecord").style.display = "";
+  document.getElementById("btnRecStop").style.display = "none";
+}
+
+/* ---------------- UIイベント ---------------- */
+function userGesture() { bgm.ensure(); }
+function updatePlayBtn() {
+  document.getElementById("btnPlay").textContent = state.playing ? "⏸ 一時停止" : "▶ 上演";
+}
+document.getElementById("btnPlay").addEventListener("click", () => {
+  if (!state.story) return alert("まだ物語がありません。「AIで物語を自動作成」か「サンプル劇場」を押してください");
+  userGesture();
+  state.playing = !state.playing;
+  if (state.playing && state.phase === "idle") startScene(0, false);
+  updatePlayBtn();
+});
+document.getElementById("btnRestart").addEventListener("click", () => {
+  if (!state.story) return;
+  userGesture(); state.playing = true; state.phase = "idle"; startScene(0, false); updatePlayBtn();
+});
+document.getElementById("btnNext").addEventListener("click", () => { userGesture(); state.playing = true; advance(); updatePlayBtn(); });
+canvas.addEventListener("click", () => { if (state.recording) return; userGesture(); state.playing = true; advance(); updatePlayBtn(); });
+document.getElementById("chkAuto").addEventListener("change", e => { state.auto = e.target.checked; });
+document.getElementById("btnGenerate").addEventListener("click", () => { userGesture(); generateStory(); });
+document.getElementById("btnSample").addEventListener("click", () => { loadStory(sampleStory()); genStatus.className = ""; genStatus.textContent = "サンプル劇場を上演します"; });
+document.getElementById("btnRecord").addEventListener("click", startRecording);
+document.getElementById("btnRecStop").addEventListener("click", stopRecording);
+
+/* ---------------- 起動 ---------------- */
+loadChars();
+renderCharList();
+try {
+  const saved = JSON.parse(localStorage.getItem("bb_story") || "null");
+  if (saved && Array.isArray(saved.scenes) && saved.scenes.length) {
+    state.story = saved; renderScriptList(); state.phase = "typing";
+  }
+} catch (e) {}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

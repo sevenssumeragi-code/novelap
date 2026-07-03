@@ -15,9 +15,11 @@ dependencies = [
 
 [project.scripts]
 novel-forge = "novel_forge.cli:main"
+bb-theater = "bb_theater.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["novel_forge*"]
+include = ["novel_forge*", "bb_theater*"]
 
 [tool.setuptools.package-data]
 novel_forge = ["static/*"]
+bb_theater = ["static/*"]

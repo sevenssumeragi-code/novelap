@@ -65,9 +65,14 @@ class NovelLLM:
         return kwargs
 
     # ------------------------------------------------------------------
-    def stream_text(self, system: str, user: str, max_tokens: int = 32000) -> Iterator[str]:
-        """本文をストリーミング生成する。チャンク文字列を逐次 yield する。"""
-        kwargs = self._kwargs(system, user, max_tokens)
+    def stream_text(
+        self, system: str, user: str, max_tokens: int = 32000, schema: dict | None = None
+    ) -> Iterator[str]:
+        """本文をストリーミング生成する。チャンク文字列を逐次 yield する。
+
+        schema を渡すと構造化出力(JSON Schema)モードでストリーミングする。
+        """
+        kwargs = self._kwargs(system, user, max_tokens, schema=schema)
         with self.client.beta.messages.stream(**kwargs) as stream:
             for chunk in stream.text_stream:
                 yield chunk

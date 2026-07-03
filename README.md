@@ -1,3 +1,16 @@
+このリポジトリには2つのアプリが入っています。
+
+1. **Novel Forge** — 面白さ最優先の長編小説生成アプリ(下記)
+2. **BB劇場メーカー** — ミーム風コント劇場の自動生成・上演・動画化アプリ(→ [bb_theater/README.md](bb_theater/README.md))
+
+```bash
+pip install -e .
+bb-theater      # → http://127.0.0.1:8010  BB劇場メーカー
+novel-forge serve  # → http://127.0.0.1:8000  Novel Forge
+```
+
+---
+
 # Novel Forge — 面白さ最優先の小説生成アプリ
 
 Claude(デフォルト: **Claude Fable 5**)を使って、高度で高品質な長編小説を**完成**させるアプリです。
