@@ -1,0 +1,72 @@
+"""API キー不要で即テストプレイできるサンプルシーン。"""
+
+from __future__ import annotations
+
+
+def demo_spec() -> dict:
+    return {
+        "name": "北欧モダンの小さな家",
+        "style": "Scandinavian modern",
+        "summary": "白い漆喰壁と木のアクセント、切妻屋根の 2 階建て。1 階はリビング＋キッチン。",
+        "materials": [
+            {"id": "wall_ext", "kind": "plaster", "color": "#eef0f2", "roughness": 0.9, "metalness": 0.0, "textureScale": 1.2},
+            {"id": "roof_mat", "kind": "roof", "color": "#3b4650", "roughness": 0.7, "metalness": 0.0, "textureScale": 2.0},
+            {"id": "floor_wood", "kind": "wood", "color": "#c9a878", "roughness": 0.6, "metalness": 0.0, "textureScale": 2.5},
+            {"id": "floor_tile", "kind": "tile", "color": "#dfe3e6", "roughness": 0.4, "metalness": 0.0, "textureScale": 3.0},
+            {"id": "wall_in", "kind": "paint", "color": "#f7f5f0", "roughness": 0.95, "metalness": 0.0, "textureScale": 1.0},
+            {"id": "wood_dark", "kind": "wood", "color": "#6b4a2f", "roughness": 0.5, "metalness": 0.0, "textureScale": 3.0},
+            {"id": "fabric_gray", "kind": "fabric", "color": "#8b9099", "roughness": 0.9, "metalness": 0.0, "textureScale": 4.0},
+            {"id": "metal_black", "kind": "metal", "color": "#2b2b2e", "roughness": 0.35, "metalness": 0.9, "textureScale": 2.0},
+            {"id": "glass", "kind": "glass", "color": "#bcd6e6", "roughness": 0.05, "metalness": 0.0, "textureScale": 1.0},
+            {"id": "marble_top", "kind": "marble", "color": "#eae7e1", "roughness": 0.25, "metalness": 0.0, "textureScale": 2.0},
+            {"id": "grass", "kind": "grass", "color": "#6f8f4a", "roughness": 1.0, "metalness": 0.0, "textureScale": 0.25},
+            {"id": "warm_light", "kind": "paint", "color": "#fff4d6", "roughness": 1.0, "metalness": 0.0, "textureScale": 1.0, "emissive": "#ffd98a"},
+        ],
+        "building": {
+            "width": 9.0, "depth": 7.0, "floors": 2, "floorHeight": 2.7,
+            "wallMaterial": "wall_ext",
+            "roof": {"type": "gable", "height": 2.2, "overhang": 0.5, "material": "roof_mat"},
+            "features": [
+                {"kind": "door", "side": "front", "floor": 0, "u": 0.5, "width": 1.1, "height": 2.1, "sill": 0.0, "material": "wood_dark"},
+                {"kind": "window", "side": "front", "floor": 0, "u": 0.2, "width": 1.6, "height": 1.4, "sill": 0.9, "material": "glass"},
+                {"kind": "window", "side": "front", "floor": 0, "u": 0.8, "width": 1.6, "height": 1.4, "sill": 0.9, "material": "glass"},
+                {"kind": "window", "side": "front", "floor": 1, "u": 0.25, "width": 1.2, "height": 1.2, "sill": 0.7, "material": "glass"},
+                {"kind": "window", "side": "front", "floor": 1, "u": 0.75, "width": 1.2, "height": 1.2, "sill": 0.7, "material": "glass"},
+                {"kind": "window", "side": "left", "floor": 0, "u": 0.5, "width": 1.4, "height": 1.3, "sill": 0.9, "material": "glass"},
+                {"kind": "window", "side": "right", "floor": 0, "u": 0.5, "width": 1.4, "height": 1.3, "sill": 0.9, "material": "glass"},
+                {"kind": "window", "side": "back", "floor": 0, "u": 0.5, "width": 2.4, "height": 1.6, "sill": 0.9, "material": "glass"},
+            ],
+        },
+        "rooms": [
+            {"name": "リビング", "floor": 0, "x": -2.0, "z": 0.0, "width": 4.5, "depth": 6.5, "wallMaterial": "wall_in", "floorMaterial": "floor_wood"},
+            {"name": "キッチン", "floor": 0, "x": 2.5, "z": -1.5, "width": 4.0, "depth": 3.5, "wallMaterial": "wall_in", "floorMaterial": "floor_tile"},
+            {"name": "ダイニング", "floor": 0, "x": 2.5, "z": 2.0, "width": 4.0, "depth": 3.0, "wallMaterial": "wall_in", "floorMaterial": "floor_wood"},
+            {"name": "寝室", "floor": 1, "x": -2.0, "z": 0.0, "width": 4.5, "depth": 6.5, "wallMaterial": "wall_in", "floorMaterial": "floor_wood"},
+            {"name": "書斎", "floor": 1, "x": 2.5, "z": 0.0, "width": 4.0, "depth": 6.5, "wallMaterial": "wall_in", "floorMaterial": "floor_wood"},
+        ],
+        "furniture": [
+            {"type": "sofa", "floor": 0, "x": -3.0, "z": 1.5, "rotation": 90, "width": 2.2, "depth": 0.9, "height": 0.85, "material": "fabric_gray"},
+            {"type": "coffeetable", "floor": 0, "x": -1.8, "z": 1.5, "rotation": 0, "width": 1.1, "depth": 0.6, "height": 0.42, "material": "wood_dark"},
+            {"type": "rug", "floor": 0, "x": -1.9, "z": 1.5, "rotation": 0, "width": 3.0, "depth": 2.0, "height": 0.02, "material": "fabric_gray"},
+            {"type": "tvstand", "floor": 0, "x": -0.6, "z": 1.5, "rotation": -90, "width": 1.8, "depth": 0.45, "height": 0.5, "material": "wood_dark"},
+            {"type": "tv", "floor": 0, "x": -0.5, "z": 1.5, "rotation": -90, "width": 1.5, "depth": 0.1, "height": 0.85, "material": "metal_black"},
+            {"type": "bookshelf", "floor": 0, "x": -4.0, "z": -2.4, "rotation": 0, "width": 1.8, "depth": 0.4, "height": 2.1, "material": "wood_dark"},
+            {"type": "floorlamp", "floor": 0, "x": -4.0, "z": 2.8, "rotation": 0, "width": 0.4, "depth": 0.4, "height": 1.7, "material": "warm_light"},
+            {"type": "plant", "floor": 0, "x": -0.6, "z": -2.6, "rotation": 0, "width": 0.7, "depth": 0.7, "height": 1.6, "material": "wood_dark"},
+            {"type": "diningtable", "floor": 0, "x": 2.5, "z": 2.2, "rotation": 0, "width": 1.6, "depth": 0.9, "height": 0.74, "material": "wood_dark"},
+            {"type": "chair", "floor": 0, "x": 1.8, "z": 2.2, "rotation": 90, "width": 0.5, "depth": 0.5, "height": 0.9, "material": "wood_dark"},
+            {"type": "chair", "floor": 0, "x": 3.2, "z": 2.2, "rotation": -90, "width": 0.5, "depth": 0.5, "height": 0.9, "material": "wood_dark"},
+            {"type": "chair", "floor": 0, "x": 2.5, "z": 1.4, "rotation": 180, "width": 0.5, "depth": 0.5, "height": 0.9, "material": "wood_dark"},
+            {"type": "kitchencounter", "floor": 0, "x": 2.5, "z": -2.9, "rotation": 0, "width": 3.6, "depth": 0.65, "height": 0.9, "material": "marble_top"},
+            {"type": "fridge", "floor": 0, "x": 4.0, "z": -2.7, "rotation": 0, "width": 0.7, "depth": 0.7, "height": 1.8, "material": "metal_black"},
+            {"type": "stove", "floor": 0, "x": 1.5, "z": -2.9, "rotation": 0, "width": 0.7, "depth": 0.6, "height": 0.9, "material": "metal_black"},
+            {"type": "bed", "floor": 1, "x": -3.0, "z": 1.5, "rotation": 0, "width": 1.6, "depth": 2.1, "height": 0.6, "material": "fabric_gray"},
+            {"type": "nightstand", "floor": 1, "x": -4.0, "z": 0.2, "rotation": 0, "width": 0.5, "depth": 0.4, "height": 0.55, "material": "wood_dark"},
+            {"type": "wardrobe", "floor": 1, "x": -3.0, "z": -2.9, "rotation": 0, "width": 2.0, "depth": 0.6, "height": 2.2, "material": "wood_dark"},
+            {"type": "desk", "floor": 1, "x": 2.5, "z": -2.8, "rotation": 0, "width": 1.4, "depth": 0.7, "height": 0.74, "material": "wood_dark"},
+            {"type": "chair", "floor": 1, "x": 2.5, "z": -2.1, "rotation": 180, "width": 0.5, "depth": 0.5, "height": 0.95, "material": "metal_black"},
+            {"type": "bookshelf", "floor": 1, "x": 4.0, "z": 0.0, "rotation": -90, "width": 3.0, "depth": 0.4, "height": 2.1, "material": "wood_dark"},
+        ],
+        "ground": {"material": "grass", "size": 40},
+        "lighting": {"timeOfDay": "day", "sunIntensity": 3.0, "ambient": 0.6},
+    }

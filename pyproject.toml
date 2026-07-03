@@ -5,19 +5,22 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "novel-forge"
 version = "0.1.0"
-description = "Fable 5 の思考パターンで高品質な長編小説を完成させる小説生成アプリ"
+description = "Fable 5 の思考パターンで高品質な長編小説を完成させる小説生成アプリ / 画像と文章から 3D モデルを作る Builder3D"
 requires-python = ">=3.10"
 dependencies = [
     "anthropic>=0.60.0",
     "fastapi>=0.110",
     "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]
 novel-forge = "novel_forge.cli:main"
+builder3d = "builder3d.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["novel_forge*"]
+include = ["novel_forge*", "builder3d*"]
 
 [tool.setuptools.package-data]
 novel_forge = ["static/*"]
+builder3d = ["static/*"]
