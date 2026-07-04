@@ -1,12 +1,13 @@
-// main.js — シーン管理・UI・テストプレイ(ウォークモード)・GLB/OBJ書き出し
+// main.js — シーン管理・UI・画像認識連携・テストプレイ(ウォークモード)・GLB/OBJ書き出し
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
-import { parsePrompt, describeSpec } from './parser.js';
+import { parsePrompt, describeSpec, FURNITURE_NAMES } from './parser.js';
 import { TextureFactory, fileToCanvas, dominantColor } from './textures.js';
 import { buildModel, buildEnvironment } from './builders.js';
+import { detectObjects, roomItemsFromDetections, guessExterior, describeDetections } from './detector.js';
 
 const $ = (id) => document.getElementById(id);
 const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
@@ -15,7 +16,7 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
 const state = {
   mode: 'auto',
   quality: 2048,
-  images: [],           // {id, name, canvas, role, url}
+  images: [],           // {id, name, canvas, role, detections, detecting}
   model: null,          // 書き出し対象の Group
   env: null,
   spec: null,
@@ -33,6 +34,18 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+// GPU が一度に扱えるテクスチャの最大辺 (多くの環境で 8192 or 16384)
+const MAX_TEX = renderer.capabilities.maxTextureSize || 4096;
+
+// 8K などでGPUメモリを使い切った場合、白画面のまま固まらずに理由を表示する
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  setStatus('⚠ GPUメモリが不足し描画が中断されました。テクスチャ品質を下げて再生成してください。', true);
+});
+canvas.addEventListener('webglcontextrestored', () => {
+  setStatus('描画が復帰しました。もう一度「3Dモデルを生成」を押してください。');
+});
+
 const scene = new THREE.Scene();
 {
   // 空のグラデーション背景
@@ -48,6 +61,17 @@ const scene = new THREE.Scene();
   bg.colorSpace = THREE.SRGBColorSpace;
   scene.background = bg;
   scene.fog = new THREE.Fog(0xcfe2ee, 60, 260);
+
+  // 空を環境マップ化してガラス・金属・画面などに自然な映り込みを与える
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    envScene.background = bg;
+    scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+    pmrem.dispose();
+  } catch (e) {
+    console.warn('環境マップ生成をスキップ:', e);
+  }
 }
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
@@ -167,9 +191,13 @@ function segInit(segId, attr, onPick) {
 segInit('modeSeg', 'mode', v => { state.mode = v; });
 segInit('qualitySeg', 'q', v => {
   state.quality = parseInt(v, 10);
-  $('qualityHint').textContent = state.quality >= 8192
-    ? '⚠ 8K: 生成に数十秒・書き出しに大きなメモリを使います。高性能なPC推奨。'
-    : '8Kは最高精細ですが、生成と書き出しに時間とメモリを多く使います。';
+  if (state.quality > MAX_TEX) {
+    $('qualityHint').textContent = `⚠ この端末のGPUは最大 ${MAX_TEX}px までのため、アップロード画像は ${MAX_TEX}px に制限されます(生成自体は可能)。`;
+  } else if (state.quality >= 8192) {
+    $('qualityHint').textContent = '8K: アップロード画像を最高精細で使用します。生成パターン(レンガ等)はタイリングにより8K相当の密度になります。';
+  } else {
+    $('qualityHint').textContent = '2Kで十分きれいです。8Kは高解像度の画像をアップロードした時に効果があります。';
+  }
 });
 
 $('exampleChips').addEventListener('click', e => {
@@ -179,14 +207,15 @@ $('exampleChips').addEventListener('click', e => {
 
 // ---------------- UI: 画像アップロード ----------------
 const ROLE_OPTIONS = [
-  ['auto', '自動で割り当て'],
-  ['wall', '外壁'],
-  ['roof', '屋根'],
+  ['auto', '自動(写真→家具を認識 / 素材→質感)'],
+  ['scene', 'シーン(写真の家具を3D化)'],
+  ['wall', '外壁の質感'],
+  ['roof', '屋根の質感'],
   ['sign', '看板・日よけ'],
-  ['interiorWall', '内壁(壁紙)'],
-  ['floor', '床'],
-  ['furniture', '家具(木部)'],
-  ['fabric', '布(ソファ等)'],
+  ['interiorWall', '内壁(壁紙)の質感'],
+  ['floor', '床の質感'],
+  ['furniture', '家具(木部)の質感'],
+  ['fabric', '布(ソファ等)の質感'],
   ['tv', 'テレビ画面'],
 ];
 
@@ -195,12 +224,40 @@ async function addFiles(files) {
     if (!file.type.startsWith('image/')) continue;
     try {
       const cv = await fileToCanvas(file);
-      state.images.push({ id: imageIdSeq++, name: file.name, canvas: cv, role: 'auto' });
+      const img = { id: imageIdSeq++, name: file.name, canvas: cv, role: 'auto', detections: undefined, detecting: true };
+      state.images.push(img);
+      renderThumbs();
+      setStatus('画像内の家具・物体を認識しています…(初回はモデル読み込みに数秒かかります)');
+      detectObjects(cv).then(dets => {
+        img.detecting = false;
+        img.detections = dets;   // null = モデル利用不可
+        renderThumbs();
+        if (dets == null) {
+          setStatus('この環境では画像認識を利用できないため、画像は質感(テクスチャ)として使用します。');
+        } else {
+          const summary = describeDetections(dets);
+          setStatus(summary
+            ? `✓ 画像から認識: ${summary} — 「3Dモデルを生成」で立体化します。`
+            : '画像から家具は検出されませんでした。質感(テクスチャ)として使用します。');
+        }
+      }).catch(err => {
+        console.warn(err);
+        img.detecting = false;
+        img.detections = null;
+        renderThumbs();
+      });
     } catch (err) {
       setStatus('画像の読み込みに失敗: ' + file.name, true);
     }
   }
   renderThumbs();
+}
+
+function detectionTagText(img) {
+  if (img.detecting) return '🔍 認識中…';
+  if (img.detections == null) return '素材として使用';
+  const summary = describeDetections(img.detections);
+  return summary ? '✓ ' + summary : '物体なし(素材として使用)';
 }
 
 function renderThumbs() {
@@ -219,6 +276,9 @@ function renderThumbs() {
     const name = document.createElement('div');
     name.className = 'name';
     name.textContent = `${img.name} (${img.canvas.width}×${img.canvas.height})`;
+    const tag = document.createElement('div');
+    tag.className = 'tag' + (img.detections && img.detections.length ? ' ok' : '');
+    tag.textContent = detectionTagText(img);
     const sel = document.createElement('select');
     for (const [v, label] of ROLE_OPTIONS) {
       const o = document.createElement('option');
@@ -227,7 +287,7 @@ function renderThumbs() {
     }
     sel.value = img.role;
     sel.addEventListener('change', () => { img.role = sel.value; });
-    meta.append(name, sel);
+    meta.append(name, tag, sel);
     const del = document.createElement('button');
     del.className = 'del';
     del.textContent = '✕';
@@ -287,9 +347,23 @@ function disposeGroup(root) {
     if (o.isMesh) {
       o.geometry?.dispose();
       const mats = Array.isArray(o.material) ? o.material : [o.material];
-      mats.forEach(m => { m.map?.dispose(); m.dispose(); });
+      mats.forEach(m => { m.map?.dispose(); m.bumpMap?.dispose(); m.dispose(); });
     }
   });
+}
+
+const STYLE_JA = { brick: 'レンガ', stone: '石造り', tile: 'タイル', metal: '金属', wood: '木', concrete: 'コンクリート', glass: 'ガラス', plaster: '塗り壁', modern: 'モダン', japanese: '和風' };
+
+/** シーン画像(=写っている物を3D化する画像)とテクスチャ素材画像に分ける */
+function splitImages() {
+  const sceneImgs = [];
+  const texImgs = [];
+  for (const im of state.images) {
+    if (im.role === 'scene') sceneImgs.push(im);
+    else if (im.role === 'auto' && im.detections && im.detections.some(d => d.type)) sceneImgs.push(im);
+    else texImgs.push(im);
+  }
+  return { sceneImgs, texImgs };
 }
 
 async function generate() {
@@ -300,23 +374,63 @@ async function generate() {
     const text = $('prompt').value;
     const spec = parsePrompt(text, state.mode);
 
-    // 画像 → 役割の解決
+    // ---- 画像認識の反映 ----
+    const { sceneImgs, texImgs } = splitImages();
+    let recognizedNote = '';
+
+    if (sceneImgs.length > 0) {
+      // 画像内の家具 → アイテム化
+      let imgItems = [], floorC = null, wallC = null;
+      for (const im of sceneImgs) {
+        const rr = roomItemsFromDetections(im.canvas, im.detections || []);
+        imgItems = imgItems.concat(rr.items);
+        if (floorC == null) floorC = rr.floorColor;
+        if (wallC == null) wallC = rr.wallColor;
+      }
+
+      // 建物モードが「明示的」な場合のみ外観推定。文章が空(自動判定の既定)で
+      // 画像から家具が見つかったなら、部屋の再現を優先する。
+      const buildingExplicit = state.mode === 'building' || spec.hasBuildingHint;
+      if (spec.mode === 'building' && (buildingExplicit || imgItems.length === 0)) {
+        // 外観モード: 画像から壁の質感と色を推定
+        const gx = guessExterior(sceneImgs[0].canvas);
+        if (spec.building.style == null) spec.building.style = gx.style;
+        if (spec.color == null) spec.color = gx.color;
+        recognizedNote = `外観を画像から推定(${STYLE_JA[spec.building.style] || spec.building.style}) `;
+      } else if (imgItems.length > 0) {
+        if (state.mode === 'furniture') {
+          // 家具モード固定: 写真の家具を全て単体家具として並べる
+          spec.furniture = spec.hasTextFurniture ? [...spec.furniture, ...imgItems] : imgItems;
+        } else {
+          // 部屋として、写真の家具を写真内の位置どおりに配置
+          if (spec.mode !== 'room') spec.mode = 'room';
+          spec.room.items = spec.hasTextFurniture ? [...spec.room.items, ...imgItems] : imgItems;
+          spec.room.floorColor = floorC;
+          spec.room.wallColor = wallC;
+        }
+        const names = imgItems.map(i => FURNITURE_NAMES[i.type] || i.type);
+        const uniq = [...new Set(names)];
+        recognizedNote = `画像から${imgItems.length}点の家具を認識(${uniq.join('・')}) `;
+      }
+    }
+
+    // ---- テクスチャ素材画像 → 役割の解決 ----
     const imagesByRole = {};
-    const autoQueue = rolesForAuto(spec.mode).filter(r => !state.images.some(i => i.role === r));
-    for (const img of state.images) {
+    const autoQueue = rolesForAuto(spec.mode).filter(r => !texImgs.some(i => i.role === r));
+    for (const img of texImgs) {
       let role = img.role;
       if (role === 'auto') role = autoQueue.shift();
       if (role && !imagesByRole[role]) imagesByRole[role] = img.canvas;
     }
-    // 指示に色がなければ最初の画像から代表色を抽出
-    if (spec.color == null && state.images.length > 0) {
-      spec.color = dominantColor(state.images[0].canvas).getHex();
+    // 指示に色がなければ画像から代表色を抽出
+    if (spec.color == null && texImgs.length > 0) {
+      spec.color = dominantColor(texImgs[0].canvas).getHex();
     }
 
-    setStatus(`テクスチャ生成中 (${state.quality / 1024}K)…${state.quality >= 4096 ? ' 高解像度のため時間がかかります' : ''}`);
+    setStatus(`${recognizedNote}テクスチャ生成中 (${Math.min(state.quality, MAX_TEX) / 1024}K)…${state.quality >= 4096 ? ' 高解像度のため時間がかかります' : ''}`);
     await tick(60);
 
-    const T = new TextureFactory(state.quality, imagesByRole, renderer.capabilities.getMaxAnisotropy());
+    const T = new TextureFactory(state.quality, imagesByRole, renderer.capabilities.getMaxAnisotropy(), MAX_TEX);
     const result = buildModel(spec, T);
 
     setStatus('シーンを構築中…');
@@ -348,8 +462,8 @@ async function generate() {
     $('afterGen').classList.remove('hidden');
     updateHud();
     const tri = countTriangles(state.model);
-    setStatus(`✓ 生成完了: ${describeSpec(spec)}(${tri.toLocaleString()}三角形)。テストプレイやダウンロードができます。`);
-    window.__lastGenerated = { mode: spec.mode, triangles: tri, quality: state.quality };
+    setStatus(`✓ 生成完了: ${recognizedNote ? recognizedNote + '→ ' : ''}${describeSpec(spec)}(${tri.toLocaleString()}三角形)。テストプレイやダウンロードができます。`);
+    window.__lastGenerated = { mode: spec.mode, triangles: tri, quality: state.quality, recognized: recognizedNote || null };
   } catch (err) {
     console.error(err);
     setStatus('生成に失敗しました: ' + err.message, true);
@@ -386,7 +500,7 @@ $('glbBtn').addEventListener('click', () => {
   }, (err) => {
     console.error(err);
     setStatus('GLB書き出しに失敗: ' + err.message, true);
-  }, { binary: true, maxTextureSize: 8192 });
+  }, { binary: true, maxTextureSize: Math.min(state.quality, MAX_TEX) });
 });
 
 $('objBtn').addEventListener('click', () => {
@@ -424,6 +538,8 @@ window.__atelier = {
     await generate();
     return window.__lastGenerated;
   },
+  parsePrompt,
   state,
+  maxTex: MAX_TEX,
 };
-setStatus('準備完了。指示を書いて「3Dモデルを生成」を押してください。');
+setStatus('準備完了。指示を書くか、部屋・家具・建物の写真をアップロードして「3Dモデルを生成」を押してください。');

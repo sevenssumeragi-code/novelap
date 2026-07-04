@@ -33,12 +33,16 @@
 
     <section>
       <h2>2. 文章で指示</h2>
-      <textarea id="prompt" rows="4" placeholder="例: 赤いレンガの3階建てのカフェ。三角屋根でベランダ付き。&#10;例: 白いモダンな10階建てのマンション&#10;例: 木の床のリビング。ソファとテーブルとテレビと観葉植物。&#10;例: 青いソファ"></textarea>
+      <textarea id="prompt" rows="4" placeholder="例: 赤いレンガの3階建てのカフェ。三角屋根でベランダ付き。&#10;例: 石造りの城。庭とプール付き&#10;例: 8畳の寝室。ベッドと青いソファと観葉植物2つ&#10;例: 赤いソファと椅子4脚"></textarea>
       <div class="chips" id="exampleChips">
         <button>レンガの3階建てのカフェ、三角屋根</button>
         <button>ガラス張りの20階建てのタワー</button>
-        <button>木の床の広いリビング、ソファとテレビと本棚</button>
-        <button>木製のテーブルと椅子</button>
+        <button>石造りの城、庭付き</button>
+        <button>寄棟屋根の和風の家</button>
+        <button>10畳のリビング、ソファとテレビと本棚と観葉植物</button>
+        <button>和室、こたつと座布団4枚</button>
+        <button>赤いソファと椅子4脚と木のテーブル</button>
+        <button>ピアノと暖炉のある書斎</button>
       </div>
     </section>
 
@@ -47,7 +51,7 @@
       <div id="drop">
         <input type="file" id="fileInput" accept="image/*" multiple>
         <p>ここに画像をドロップ<br>またはクリックして選択</p>
-        <p class="hint">アップロードした画像はテクスチャ(外壁・屋根・壁紙・床・家具など)として3Dモデルに反映されます。8192pxまでの高解像度画像に対応。</p>
+        <p class="hint">部屋の写真 → 写っている家具(ソファ・椅子・テーブル・テレビ・ベッド等)を自動認識し、位置と色を保ったまま全て3D化します。素材写真(レンガ・木目など) → 質感テクスチャとして使用。すべてブラウザ内で処理され、サーバーには送信されません。</p>
       </div>
       <div id="thumbs"></div>
     </section>
@@ -60,7 +64,7 @@
         <button data-q="4096">4K</button>
         <button data-q="8192">8K</button>
       </div>
-      <p class="hint" id="qualityHint">8Kは最高精細ですが、生成と書き出しに時間とメモリを多く使います。</p>
+      <p class="hint" id="qualityHint">2Kで十分きれいです。8Kは高解像度の画像をアップロードした時に効果があります。</p>
     </section>
 
     <button id="generateBtn" class="primary">✦ 3Dモデルを生成</button>

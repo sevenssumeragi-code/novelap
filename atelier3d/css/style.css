@@ -65,6 +65,11 @@ textarea:focus { outline: none; border-color: #3563e9; }
 .thumb img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
 .thumb .meta { flex: 1; min-width: 0; }
 .thumb .name { font-size: 11px; color: #c9cdd6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb .tag {
+  margin-top: 3px; font-size: 10px; color: #9aa0ab; line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.thumb .tag.ok { color: #8fd18f; }
 .thumb select {
   margin-top: 4px; width: 100%;
   background: #1c2027; color: #e8e6e0; border: 1px solid #333a45;
