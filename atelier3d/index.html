@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D建築アトリエ — 画像とことばから建物・内装・家具を生成</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <h1>🏛 3D建築アトリエ</h1>
+    <p class="sub">画像とことばから、建物の外観・内装・家具を3Dモデルとして生成しダウンロードできます。</p>
+
+    <section>
+      <h2>1. 作るもの</h2>
+      <div class="seg" id="modeSeg">
+        <button data-mode="auto" class="on">自動判定</button>
+        <button data-mode="building">建物の外観</button>
+        <button data-mode="room">内装(部屋)</button>
+        <button data-mode="furniture">家具</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. 文章で指示</h2>
+      <textarea id="prompt" rows="4" placeholder="例: 赤いレンガの3階建てのカフェ。三角屋根でベランダ付き。&#10;例: 石造りの城。庭とプール付き&#10;例: 8畳の寝室。ベッドと青いソファと観葉植物2つ&#10;例: 赤いソファと椅子4脚"></textarea>
+      <div class="chips" id="exampleChips">
+        <button>レンガの3階建てのカフェ、三角屋根</button>
+        <button>ガラス張りの20階建てのタワー</button>
+        <button>石造りの城、庭付き</button>
+        <button>寄棟屋根の和風の家</button>
+        <button>10畳のリビング、ソファとテレビと本棚と観葉植物</button>
+        <button>和室、こたつと座布団4枚</button>
+        <button>赤いソファと椅子4脚と木のテーブル</button>
+        <button>ピアノと暖炉のある書斎</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. 参考画像 <span class="opt">(任意・複数可)</span></h2>
+      <div id="drop">
+        <input type="file" id="fileInput" accept="image/*" multiple>
+        <p>ここに画像をドロップ<br>またはクリックして選択</p>
+        <p class="hint">部屋の写真 → 写っている家具(ソファ・椅子・テーブル・テレビ・ベッド等)を自動認識し、位置と色を保ったまま全て3D化します。素材写真(レンガ・木目など) → 質感テクスチャとして使用。すべてブラウザ内で処理され、サーバーには送信されません。</p>
+      </div>
+      <div id="thumbs"></div>
+    </section>
+
+    <section>
+      <h2>4. テクスチャ品質</h2>
+      <div class="seg" id="qualitySeg">
+        <button data-q="1024">1K</button>
+        <button data-q="2048" class="on">2K</button>
+        <button data-q="4096">4K</button>
+        <button data-q="8192">8K</button>
+      </div>
+      <p class="hint" id="qualityHint">2Kで十分きれいです。8Kは高解像度の画像をアップロードした時に効果があります。</p>
+    </section>
+
+    <button id="generateBtn" class="primary">✦ 3Dモデルを生成</button>
+    <div id="status" class="status"></div>
+
+    <section id="afterGen" class="hidden">
+      <h2>5. テストプレイ & ダウンロード</h2>
+      <button id="walkBtn" class="secondary">🎮 テストプレイ(歩いて確認)</button>
+      <p class="hint">クリックで開始 / <b>W A S D</b> か矢印キーで移動、マウスで見回し、<b>Shift</b>でダッシュ、<b>Esc</b>で終了。</p>
+      <div class="row">
+        <button id="glbBtn" class="secondary">⬇ GLB形式</button>
+        <button id="objBtn" class="secondary">⬇ OBJ形式</button>
+        <button id="shotBtn" class="secondary">📷 スクリーンショット</button>
+      </div>
+      <p class="hint">GLBはテクスチャ埋め込み済み。Blender・Unity・Unreal・各種3Dビューアで開けます。OBJは形状のみです。</p>
+    </section>
+
+    <footer>Three.js 使用 / すべてブラウザ内で生成(サーバー送信なし)</footer>
+  </aside>
+
+  <main id="viewport">
+    <canvas id="canvas3d"></canvas>
+    <div id="viewHud">
+      <span id="hudInfo">「3Dモデルを生成」を押すとここにプレビューが表示されます</span>
+    </div>
+    <div id="walkHud" class="hidden">
+      <div class="crosshair">+</div>
+      <div class="walkHelp">W/A/S/D: 移動 &nbsp; マウス: 見回し &nbsp; Shift: ダッシュ &nbsp; Esc: 終了</div>
+    </div>
+  </main>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
