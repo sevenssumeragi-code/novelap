@@ -1,0 +1,129 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  background: #14171c; color: #e8e6e0;
+  overflow: hidden;
+}
+#app { display: flex; height: 100vh; }
+
+/* ---------- side panel ---------- */
+#panel {
+  width: 360px; min-width: 360px;
+  background: #1c2027;
+  border-right: 1px solid #2c313a;
+  padding: 20px 18px 32px;
+  overflow-y: auto;
+}
+#panel h1 { font-size: 20px; letter-spacing: .04em; }
+#panel .sub { font-size: 12px; color: #9aa0ab; margin: 6px 0 18px; line-height: 1.6; }
+#panel section { margin-bottom: 20px; }
+#panel h2 { font-size: 13px; color: #c9cdd6; margin-bottom: 8px; font-weight: 600; }
+#panel h2 .opt { font-weight: 400; color: #7d8390; font-size: 11px; }
+.hint { font-size: 11px; color: #7d8390; line-height: 1.6; margin-top: 6px; }
+
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button {
+  flex: 1; min-width: 70px;
+  padding: 8px 4px; font-size: 12px;
+  background: #262b34; color: #c9cdd6;
+  border: 1px solid #333a45; border-radius: 8px; cursor: pointer;
+}
+.seg button.on { background: #3563e9; border-color: #3563e9; color: #fff; font-weight: 600; }
+.seg button:hover:not(.on) { background: #2e3440; }
+
+textarea {
+  width: 100%; resize: vertical;
+  background: #262b34; color: #e8e6e0;
+  border: 1px solid #333a45; border-radius: 8px;
+  padding: 10px; font-size: 13px; line-height: 1.6; font-family: inherit;
+}
+textarea:focus { outline: none; border-color: #3563e9; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips button {
+  font-size: 11px; padding: 4px 8px;
+  background: transparent; color: #8fa3d8;
+  border: 1px solid #39424f; border-radius: 999px; cursor: pointer;
+}
+.chips button:hover { background: #262b34; }
+
+#drop {
+  position: relative; border: 2px dashed #39424f; border-radius: 10px;
+  padding: 18px 12px; text-align: center; cursor: pointer;
+}
+#drop.over { border-color: #3563e9; background: #232a38; }
+#drop p { font-size: 12px; color: #9aa0ab; line-height: 1.6; }
+#drop .hint { margin-top: 8px; }
+#drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+#thumbs { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.thumb {
+  display: flex; gap: 10px; align-items: center;
+  background: #262b34; border: 1px solid #333a45; border-radius: 8px; padding: 6px;
+}
+.thumb img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; }
+.thumb .meta { flex: 1; min-width: 0; }
+.thumb .name { font-size: 11px; color: #c9cdd6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb select {
+  margin-top: 4px; width: 100%;
+  background: #1c2027; color: #e8e6e0; border: 1px solid #333a45;
+  border-radius: 6px; font-size: 12px; padding: 4px;
+}
+.thumb .del {
+  background: transparent; border: none; color: #7d8390;
+  font-size: 16px; cursor: pointer; padding: 4px;
+}
+.thumb .del:hover { color: #ff6b6b; }
+
+button.primary {
+  width: 100%; padding: 14px; font-size: 15px; font-weight: 700;
+  background: linear-gradient(135deg, #3563e9, #7048e8);
+  color: #fff; border: none; border-radius: 10px; cursor: pointer;
+  letter-spacing: .05em;
+}
+button.primary:hover { filter: brightness(1.1); }
+button.primary:disabled { opacity: .5; cursor: wait; }
+
+button.secondary {
+  padding: 10px 12px; font-size: 13px; font-weight: 600;
+  background: #262b34; color: #e8e6e0;
+  border: 1px solid #39424f; border-radius: 8px; cursor: pointer;
+  width: 100%;
+}
+button.secondary:hover { background: #2e3440; border-color: #3563e9; }
+#walkBtn { background: #1d3a2a; border-color: #2f6b47; }
+#walkBtn:hover { background: #24503a; }
+.row { display: flex; gap: 6px; margin-top: 10px; }
+
+.status { font-size: 12px; color: #8fd18f; margin-top: 10px; min-height: 18px; line-height: 1.5; }
+.status.err { color: #ff8a8a; }
+.hidden { display: none !important; }
+
+footer { margin-top: 24px; font-size: 10px; color: #5b616c; text-align: center; }
+
+/* ---------- viewport ---------- */
+#viewport { flex: 1; position: relative; min-width: 0; }
+#canvas3d { width: 100%; height: 100%; display: block; }
+#viewHud {
+  position: absolute; left: 0; right: 0; bottom: 14px;
+  text-align: center; pointer-events: none;
+}
+#hudInfo {
+  display: inline-block; font-size: 12px; color: #cfd3da;
+  background: rgba(20,23,28,.7); border: 1px solid #333a45;
+  border-radius: 999px; padding: 6px 16px; backdrop-filter: blur(4px);
+}
+#walkHud .crosshair {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 22px; color: rgba(255,255,255,.8); pointer-events: none;
+}
+#walkHud .walkHelp {
+  position: absolute; top: 14px; left: 0; right: 0; text-align: center;
+  font-size: 12px; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  #app { flex-direction: column; }
+  #panel { width: 100%; min-width: 0; max-height: 55vh; }
+}
