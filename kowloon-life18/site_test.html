@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧱</text></svg>">
+<title>敷地テスト — 九龍城ライフ18 (STEP 3 一人称)</title>
+<!--
+  ============================================================
+  新方式「敷地＋施設解禁」の 3D 空間を一人称で歩いて確認する独立テストページ。
+
+  ・既存の index.html / game.js / floors.js とは完全に分離されている
+  ・NPC / 会話 / ガチャ / 施設解禁 / セーブは一切読み込まない
+  ・STEP 4〜5 で InteractionSystem を挿す場所にコメントを入れてある
+  ============================================================
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05060a; }
+  body {
+    font-family: 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+    color: #e9e4d9;
+    cursor: default;
+  }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .panel {
+    background: rgba(14, 14, 22, 0.88);
+    border: 1px solid rgba(255, 200, 106, 0.42);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+  }
+  .hidden { display: none !important; }
+
+  /* ---- クロスヘア ---- */
+  #crosshair {
+    position: fixed; top: 50%; left: 50%;
+    width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none; z-index: 12;
+  }
+  /* 「調べられる対象を見ている」ときに付ける */
+  #crosshair.active { background: #ffca6a; transform: scale(1.8); }
+
+  /* 調べられる対象のラベル (STEP 5 で E キーの操作に発展させる) */
+  #prompt {
+    position: fixed; top: calc(50% + 26px); left: 50%; transform: translateX(-50%);
+    padding: 6px 14px; font-size: 13px; letter-spacing: .04em; white-space: nowrap;
+    background: rgba(14,14,22,0.9); border: 1px solid rgba(255,200,106,0.45);
+    border-radius: 5px; pointer-events: none; z-index: 12;
+  }
+
+  /* ---- ワープ地点 ---- */
+  #views {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    display: flex; flex-direction: column; gap: 6px; padding: 12px;
+    max-width: 250px;
+  }
+  #views h2 {
+    font-size: 12px; letter-spacing: .12em; color: #ffca6a;
+    margin-bottom: 4px; font-weight: 700;
+  }
+  #views button {
+    font-family: inherit; font-size: 13px; text-align: left;
+    color: #e9e4d9; background: rgba(40, 36, 56, 0.9);
+    border: 1px solid rgba(255, 200, 106, 0.3); border-radius: 7px;
+    padding: 6px 10px; cursor: pointer; transition: all .12s;
+  }
+  #views button:hover { background: rgba(80, 64, 88, 0.95); border-color: #ffca6a; }
+  #view-hint { font-size: 11.5px; line-height: 1.6; color: #b8b0a0; margin-top: 4px; min-height: 2.6em; }
+  #views .note { font-size: 10.5px; color: #7a7468; margin-top: 4px; line-height: 1.5; }
+  #views hr { border: 0; border-top: 1px dashed rgba(255,200,106,0.25); margin: 8px 0 6px; }
+  #views button.state.active { background: #6a4a20; border-color: #ffca6a; }
+
+  /* ---- デバッグ表示 ---- */
+  #debug {
+    position: fixed; top: 12px; right: 12px; z-index: 10; padding: 11px 13px;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 11.5px; line-height: 1.7; white-space: pre; color: #cfd8e4;
+  }
+  #debug b { color: #ffca6a; font-weight: 700; }
+  #debug .warn { color: #ff9a6a; }
+  #debug .ok { color: #8ce0a0; }
+
+  /* ---- 操作説明 ---- */
+  #controls {
+    position: fixed; bottom: 12px; left: 12px; z-index: 10; padding: 10px 13px;
+    font-size: 11.5px; line-height: 1.75; color: #b8b0a0;
+  }
+  #controls b { color: #ffca6a; }
+
+  /* ---- 開始オーバーレイ ---- */
+  #overlay {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: rgba(5, 6, 10, 0.82); z-index: 30; cursor: pointer;
+  }
+  #overlay .card { text-align: center; padding: 30px 44px; }
+  #overlay h1 { font-size: 22px; font-weight: 500; letter-spacing: .12em; margin-bottom: 6px; }
+  #overlay .sub { font-size: 12px; color: #8a8478; margin-bottom: 20px; }
+  #overlay .go {
+    display: inline-block; padding: 11px 30px; border-radius: 6px;
+    background: #ffca6a; color: #16130c; font-size: 15px; font-weight: 700;
+  }
+  #overlay .keys {
+    display: grid; grid-template-columns: auto auto; gap: 3px 16px;
+    justify-content: center; margin-top: 22px; font-size: 12px; color: #a8a094;
+  }
+  #overlay .keys dt { text-align: right; color: #ffca6a; }
+  #overlay .keys dd { text-align: left; }
+
+  /* ---- 起動エラー ---- */
+  #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #05060a; z-index: 40; padding: 20px; }
+  #boot .msg { font-size: 14px; letter-spacing: .08em; color: #b8b0a0; text-align: center; }
+  #boot .err {
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #ff8a9a;
+    margin-top: 14px; max-width: 80vw; white-space: pre-wrap; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="crosshair" class="hidden"></div>
+<div id="prompt" class="hidden"></div>
+
+<div id="views" class="panel">
+  <h2>ワープ地点</h2>
+  <div id="view-buttons"></div>
+  <div id="view-hint"></div>
+  <div class="note">数字キー 1〜6 でも移動</div>
+  <hr>
+  <h2>九龍書店の状態</h2>
+  <div id="state-buttons"></div>
+  <div class="note">7 / 8 / 9 キーでも切替<br>（テスト用。ガチャとは未接続）</div>
+</div>
+
+<div id="debug" class="panel">読み込み中…</div>
+
+<div id="controls" class="panel">
+  <b>WASD</b> 移動 / <b>マウス</b> 視点 / <b>Shift</b> ダッシュ / <b>Space</b> ジャンプ<br>
+  <b>1〜6</b> ワープ / <b>7</b> locked / <b>8</b> unlocked / <b>9</b> opened / <b>F3</b> デバッグ / <b>Esc</b> 解除
+</div>
+
+<div id="overlay">
+  <div class="card panel">
+    <h1>九龍横丁 敷地テスト</h1>
+    <div class="sub">STEP 3 — 一人称探索</div>
+    <div class="go">クリックして開始</div>
+    <dl class="keys">
+      <dt>WASD</dt><dd>移動</dd>
+      <dt>マウス</dt><dd>視点</dd>
+      <dt>Shift</dt><dd>ダッシュ</dd>
+      <dt>Space</dt><dd>ジャンプ</dd>
+      <dt>1〜5</dt><dd>ワープ</dd>
+      <dt>F3</dt><dd>デバッグ表示</dd>
+      <dt>Esc</dt><dd>ポインタ解除</dd>
+    </dl>
+  </div>
+</div>
+
+<div id="boot">
+  <div>
+    <div class="msg">敷地を生成しています…</div>
+    <div class="err" id="boot-err"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three.module.js",
+    "three/addons/": "./lib/addons/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================
+// キャッシュ対策
+//
+// このページのモジュールは本体ゲーム (index.html) と同じ URL 空間にある。
+// Cache-Control を送らないサーバーで先に本体を開いていると、
+// 書き換えたはずの js が古いままキャッシュから読まれてしまう。
+//
+// バージョン付きの動的 import にすると URL 自体が変わるので、
+// ブラウザのキャッシュ状態に関係なく必ず最新が読まれる。
+// STEP を進めるたびに VERSION を上げること。
+//
+// キャッシュを送らないサーバー: python tools/serve.py
+// ============================================================
+const VERSION = '?v=step7';
+
+const bootEl = document.getElementById('boot');
+const bootErrEl = document.getElementById('boot-err');
+
+function fail(err) {
+  console.error(err);
+  bootEl.style.display = 'grid';
+  bootEl.querySelector('.msg').textContent = '起動に失敗しました';
+  bootErrEl.textContent = (err && (err.stack || err.message)) || String(err);
+}
+window.addEventListener('error', (e) => fail(e.error ?? e.message));
+
+try {
+  // ---- モジュール読み込み (バージョン付きでキャッシュを回避) ----
+  const { createSite, applySiteAtmosphere, SITE_SPAWN, SITE_WAYPOINTS } =
+    await import(`./js/three/site.js${VERSION}`);
+  const { createFacilityLot, LOT_STATE, LOT_STATES } =
+    await import(`./js/three/lots.js${VERSION}`);
+  const { CAMERA_SETTINGS, PLAYER_SETTINGS } =
+    await import(`./js/player/settings.js${VERSION}`);
+  const { Input } = await import(`./js/player/input.js${VERSION}`);
+  const { Player } = await import(`./js/player/player.js${VERSION}`);
+  const { PlayerController } = await import(`./js/player/controller.js${VERSION}`);
+
+  // ============================================================
+  // レンダラ / シーン
+  // ============================================================
+  const app = document.getElementById('app');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  // 影は使わない (ポイントライトの影は1灯あたりキューブ6面ぶんの描画になる)
+  renderer.shadowMap.enabled = false;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  app.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  applySiteAtmosphere(scene);
+
+  const camera = new THREE.PerspectiveCamera(
+    CAMERA_SETTINGS.fov,
+    window.innerWidth / window.innerHeight,
+    CAMERA_SETTINGS.near,
+    CAMERA_SETTINGS.far
+  );
+
+  // ============================================================
+  // 敷地
+  // ============================================================
+  const t0 = performance.now();
+  const site = createSite();
+
+  // --- 最初の試験施設: 九龍書店 (book) ---
+  // facilities.js の book.lot / book.entrance を読んで配置する。
+  // 同じ呼び方で残り23施設も置けるが、配置情報を持つのは今のところ book だけ。
+  const bookLot = createFacilityLot('book', {
+    state: LOT_STATE.LOCKED,
+    floorY: 0.18, // 広場の床の高さ
+  });
+  site.addLot(bookLot);
+
+  const buildMs = Math.round(performance.now() - t0);
+  scene.add(site.group);
+
+  // ============================================================
+  // プレイヤー
+  // ============================================================
+  const crosshairEl = document.getElementById('crosshair');
+  const overlayEl = document.getElementById('overlay');
+
+  const input = new Input(renderer.domElement, {
+    onPointerLockChange: (locked) => {
+      overlayEl.classList.toggle('hidden', locked);
+      crosshairEl.classList.toggle('hidden', !locked);
+    },
+  });
+
+  const player = new Player();
+  player.teleport(SITE_SPAWN.position, SITE_SPAWN.yaw);
+
+  const controller = new PlayerController(player, input, {
+    getColliders: () => site.colliders,
+    onFall: () => {
+      console.warn('[site_test] 床の外へ落ちたためスポーンへ戻しました');
+      player.teleport(SITE_SPAWN.position, SITE_SPAWN.yaw);
+    },
+  });
+
+  // --- 開始 (ポインタロックはユーザー操作のハンドラ内でしか要求できない) ---
+  overlayEl.addEventListener('click', () => input.requestPointerLock());
+
+  // ============================================================
+  // ワープ地点
+  // ============================================================
+  const btnBox = document.getElementById('view-buttons');
+  const hintEl = document.getElementById('view-hint');
+
+  function warpTo(i) {
+    const w = SITE_WAYPOINTS[i];
+    if (!w) return;
+    player.teleport(w.position, w.yaw);
+    hintEl.textContent = w.hint;
+  }
+
+  SITE_WAYPOINTS.forEach((w, i) => {
+    const b = document.createElement('button');
+    b.textContent = w.name;
+    b.onclick = (e) => { e.stopPropagation(); warpTo(i); };
+    btnBox.appendChild(b);
+  });
+  hintEl.textContent = SITE_WAYPOINTS[0].hint;
+
+  // ============================================================
+  // 九龍書店の状態切り替え (テスト用。ガチャとは未接続)
+  //
+  // 将来この呼び出しが、
+  //   ガチャ当選     → setState('unlocked')
+  //   圓を払って開店 → setState('opened')
+  // に置き換わる。setState はページを再読み込みせずに
+  // 見た目・当たり判定・調べられる対象をまとめて入れ替える。
+  // ============================================================
+  const STATE_LABEL = { locked: '🔒 locked', unlocked: '🔨 unlocked', opened: '💡 opened' };
+  const stateBox = document.getElementById('state-buttons');
+  const stateButtons = new Map();
+
+  function setBookState(next) {
+    bookLot.setState(next);
+    for (const [key, btn] of stateButtons) btn.classList.toggle('active', key === next);
+    // 状態で描画対象が変わるので統計を取り直す
+    Object.assign(siteStats, site.collectStats());
+  }
+
+  LOT_STATES.forEach((st) => {
+    const b = document.createElement('button');
+    b.className = 'state';
+    b.textContent = STATE_LABEL[st];
+    b.onclick = (e) => { e.stopPropagation(); setBookState(st); };
+    stateBox.appendChild(b);
+    stateButtons.set(st, b);
+  });
+
+  // ============================================================
+  // デバッグ表示 (F3 でON/OFF)
+  // ============================================================
+  const debugEl = document.getElementById('debug');
+  let debugVisible = true;
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'F3') {
+      e.preventDefault();
+      debugVisible = !debugVisible;
+      debugEl.classList.toggle('hidden', !debugVisible);
+      return;
+    }
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= SITE_WAYPOINTS.length) { warpTo(n - 1); return; }
+    // 7 / 8 / 9 で書店の状態を切り替え (1〜6 はワープ地点なので後ろへずらしてある)
+    if (n >= 7 && n <= 9) setBookState(LOT_STATES[n - 7]);
+  });
+
+  const siteStats = { ...site.stats };
+  setBookState(bookLot.getState()); // ボタンの選択表示を初期状態に合わせる
+
+  let fps = 60;
+  let fpsSum = 0;
+  let fpsCount = 0;
+  let statAcc = 0;
+  let currentArea = 'GROUND';
+
+  function renderDebug() {
+    const info = renderer.info.render;
+    const p = player;
+    const s = siteStats;
+    const lock = input.pointerLocked
+      ? '<span class="ok">LOCKED</span>'
+      : '<span class="warn">unlocked</span>';
+    const areaHtml = currentArea === 'GROUND'
+      ? currentArea
+      : `<span class="ok">${currentArea}</span>`;
+    debugEl.innerHTML =
+      `<b>敷地テスト (STEP 4)</b>\n` +
+      `three r${THREE.REVISION} / 生成 ${buildMs}ms\n` +
+      `\n` +
+      `<b>状態</b>\n` +
+      `Book State   ${bookLot.getState()}\n` +
+      `Current Area ${areaHtml}\n` +
+      `\n` +
+      `<b>プレイヤー</b>\n` +
+      `X  ${p.position.x.toFixed(2).padStart(7)}\n` +
+      `Y  ${p.position.y.toFixed(2).padStart(7)}\n` +
+      `Z  ${p.position.z.toFixed(2).padStart(7)}\n` +
+      `速度 ${p.horizontalSpeed.toFixed(2)} m/s ${p.isRunning ? '(dash)' : ''}\n` +
+      `接地 ${p.isGrounded ? 'yes' : 'no'}\n` +
+      `視点 ${lock}\n` +
+      `\n` +
+      `<b>描画 (実測)</b>\n` +
+      `FPS         ${fps.toFixed(0)}  (平均 ${fpsCount ? (fpsSum / fpsCount).toFixed(0) : '-'})\n` +
+      `ドローコール ${info.calls}\n` +
+      `三角形       ${info.triangles.toLocaleString()}\n` +
+      `\n` +
+      `<b>シーン</b>\n` +
+      `メッシュ    ${s.meshes}\n` +
+      `Instanced   ${s.instancedMeshes} (${s.instances})\n` +
+      `ライト      ${s.lights} (point ${s.pointLights} / 影 ${s.shadowLights})\n` +
+      `コライダー  ${s.colliders} / ${s.colliderTriangles} 三角形`;
+  }
+
+  // ============================================================
+  // 調べられる対象の検出 (InteractionSystem の前段)
+  //
+  // 視線の先に site.interactables があればラベルを出す。
+  // STEP 5 では、ここに E キーの処理と既存ゲームの開業処理を接続する。
+  // ============================================================
+  const promptEl = document.getElementById('prompt');
+  const interactRay = new THREE.Raycaster();
+  interactRay.far = 3.0;
+  const forward = new THREE.Vector3();
+
+  function updateInteraction() {
+    let found = null;
+    if (input.pointerLocked && site.interactables.length) {
+      camera.getWorldDirection(forward);
+      interactRay.set(camera.position, forward);
+      const hits = interactRay.intersectObjects(site.interactables, false);
+      for (const h of hits) {
+        let node = h.object;
+        while (node && !node.userData.interactable) node = node.parent;
+        if (node) { found = node.userData.interactable; break; }
+      }
+    }
+    crosshairEl.classList.toggle('active', !!found);
+    promptEl.classList.toggle('hidden', !found);
+    if (found) promptEl.textContent = `[E] ${found.message}`;
+  }
+
+  // ============================================================
+  // リサイズ
+  // ============================================================
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ============================================================
+  // メインループ
+  //
+  // 実行順: 入力 → プレイヤー → 敷地(換気扇) → カメラ同期 → 描画
+  // STEP 4〜5 では「プレイヤー」と「カメラ同期」の間に
+  // InteractionSystem.update() を挿す (site.interactables を見る)。
+  // ============================================================
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.1);
+
+    controller.update(dt);
+
+    // エリア判定。将来 game.currentLocation() をこれに差し替える
+    currentArea = site.getAreaAt(player.position);
+
+    site.update(dt);
+    player.syncCamera(camera);
+
+    // 視線先の調べられる対象 (カメラ同期のあとに見る)
+    updateInteraction();
+
+    renderer.render(scene, camera);
+    input.endFrame();
+
+    // FPS
+    const inst = 1 / Math.max(dt, 1e-6);
+    fps = fps * 0.92 + inst * 0.08;
+    if (input.pointerLocked) { fpsSum += inst; fpsCount += 1; }
+    statAcc += dt;
+    if (statAcc > 0.2) { statAcc = 0; if (debugVisible) renderDebug(); }
+  }
+  animate();
+
+  bootEl.style.display = 'none';
+
+  console.info('[site_test] stats', { buildMs, ...siteStats });
+  console.info('[site_test] book lot', bookLot.stats);
+  console.info('[site_test] player settings', PLAYER_SETTINGS);
+  window.siteTest = { scene, camera, renderer, site, bookLot, player, controller, input, warpTo, setBookState };
+} catch (err) {
+  fail(err);
+}
+</script>
+</body>
+</html>
